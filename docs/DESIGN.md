@@ -760,27 +760,25 @@ export default async function handler(req, res) {
 - GitHub Actions `ci.yml`: pnpm 캐시 → `turbo lint typecheck test build`. PR마다 실행.
 - Dependabot: npm 주간.
 
-### 12.2 Vercel (프로젝트 2개, 같은 저장소)
+### 12.2 Vercel (단일 프로젝트, 저장소 루트)
 
-| 프로젝트         | Root Directory | Framework | 출력             |
-| ---------------- | -------------- | --------- | ---------------- |
-| `pdf-memo` (web) | `apps/web`     | Vite      | 정적 `dist/`     |
-| `pdf-memo-api`   | `apps/api`     | Other     | `api/index` 함수 |
+Hobby 개인 계정에서 대시보드 설정 없이 push만으로 동작하도록 **프로젝트 1개**로 배포한다. Root Directory는 저장소 루트(기본값) 그대로 두고, 루트 `vercel.json`이 빌드·출력·라우팅을 모두 지정한다.
 
-- Vercel Git 연동으로 PR마다 Preview 배포, `main` 머지 시 Production.
-- 웹 프로젝트 `vercel.json`으로 같은 오리진에서 API 호출(CORS·쿠키 문제 회피):
-  ```json
-  {
-    "rewrites": [
-      { "source": "/api/:path*", "destination": "https://pdf-memo-api.vercel.app/api/:path*" },
-      { "source": "/((?!api/).*)", "destination": "/index.html" }
-    ]
-  }
-  ```
-- 1단계에서는 api 프로젝트를 만들어 두되 health/meta만 배포. 프론트는 API 실패를 정상 경로로 처리.
-- 환경 변수(2단계): `DATABASE_URL`, `BLOB_*` 또는 `S3_*`, `AUTH_JWKS_URL`, `WEB_ORIGIN`.
+| 항목             | 값                                                                                                                                                 |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Install          | `pnpm install --frozen-lockfile`                                                                                                                   |
+| Build            | `pnpm turbo run build --filter=@pdf-memo/web --filter=@pdf-memo/api` (shared → web·api)                                                            |
+| Output Directory | `apps/web/dist` (Vite 정적 파일)                                                                                                                   |
+| Functions        | 루트 `api/index.js` 1개. `nest build` 결과물 `apps/api/dist/bootstrap`을 require해 Express 핸들러로 서빙                                           |
+| Rewrites         | `/api/(.*)` → `/api/index` (Nest는 원래 경로 `/api/v1/...`를 그대로 받음), 그 외 → `/index.html` (SPA 폴백). 정적 파일은 rewrite보다 먼저 매칭된다 |
+
+- web과 api가 같은 오리진·같은 커밋으로 배포되므로 CORS·쿠키 문제가 없고, PR Preview에서도 web+api를 함께 검증할 수 있다.
+- api 도메인을 하드코딩할 필요가 없다. 나중에 트래픽·배포 주기가 달라지면 apps/api를 별도 프로젝트(Root Directory `apps/api`)로 떼어내고 web 쪽 rewrite를 외부 URL로 바꾸면 된다.
+- Vercel Git 연동으로 PR마다 Preview 배포, `main` 머지 시 Production. Node 버전은 프로젝트 설정(22.x).
+- 1단계에서는 health/meta만 배포. 프론트는 API 실패를 정상 경로(로컬 모드)로 처리한다.
+- 환경 변수(2단계): `DATABASE_URL`, `BLOB_*` 또는 `S3_*`, `AUTH_JWKS_URL`. 같은 오리진이므로 `WEB_ORIGIN`(CORS)은 프록시 없이 로컬 개발할 때만 필요하다.
 - pdf.js 워커 파일과 CJK 폰트는 정적 자산으로 포함(`Cache-Control: immutable`).
-- Vercel MCP 연결이 이 세션에 있어, 프로젝트 생성·환경 변수·배포 확인을 여기서 바로 진행할 수 있다.
+- 주의: Vercel 함수는 요청 본문 4.5 MB 제한이 있으므로 2단계 PDF 업로드는 presigned URL로 스토리지에 직접 올린다(§10.2).
 
 ---
 

@@ -31,7 +31,7 @@ export default [
   },
   {
     // Vercel 서버리스 엔트리 등 CommonJS 스크립트
-    files: ['**/*.cjs', 'apps/api/api/**/*.js'],
+    files: ['**/*.cjs', 'api/**/*.js'],
     languageOptions: { sourceType: 'commonjs', globals: { ...globals.node } },
     rules: { '@typescript-eslint/no-require-imports': 'off' },
   },

@@ -12,6 +12,8 @@ apps/web        React 19 + Vite PWA. pdf.js 렌더, 필기 엔진, IndexedDB(Dex
 apps/api        NestJS 11. 1단계는 health/meta, 2단계에 동기화·Blob presign
 packages/shared 도메인 타입 · zod 스키마 · 동기화/백업 계약 (프론트·백엔드 공유)
 packages/config 공용 tsconfig
+api/index.js    Vercel 서버리스 엔트리. apps/api/dist의 Nest 앱을 불러온다
+vercel.json     단일 프로젝트 배포 설정 (빌드 · 출력 · /api rewrite · SPA 폴백)
 ```
 
 ## 시작하기
@@ -37,15 +39,17 @@ pnpm ci               # format:check + lint + build + typecheck + test
 | `pnpm typecheck` | 패키지별 `tsc --noEmit`                           |
 | `pnpm test`      | shared·web: Vitest(fake-indexeddb), api: Jest e2e |
 
-## 배포 (Vercel, 프로젝트 2개)
+## 배포 (Vercel, 단일 프로젝트)
 
-| 프로젝트       | Root Directory | 비고                                              |
-| -------------- | -------------- | ------------------------------------------------- |
-| `pdf-memo`     | `apps/web`     | Vite 정적 빌드. `/api/*`를 api 프로젝트로 rewrite |
-| `pdf-memo-api` | `apps/api`     | `api/index.js`가 `dist/`의 Nest 앱을 서버리스로   |
+GitHub `ppdoll/pdf-memo`를 Vercel에 한 번 import하면 된다. Root Directory는 비워 두고(저장소 루트),
+Framework Preset은 Other. 나머지는 루트 `vercel.json`이 지정한다.
 
-각 앱의 `vercel.json`이 설치·빌드 명령을 모노레포 루트 기준으로 지정한다.
-`apps/web/vercel.json`의 rewrite 대상 도메인은 api 프로젝트의 실제 프로덕션 도메인으로 맞춘다.
+| 경로     | 처리                                                          |
+| -------- | ------------------------------------------------------------- |
+| `/api/*` | `api/index.js` 함수 → NestJS (`apps/api/dist`)                |
+| 그 외    | `apps/web/dist`의 정적 파일, 파일이 없으면 `index.html` (SPA) |
+
+PR마다 Preview, `main` push마다 Production이 배포된다.
 
 ## 단계
 
