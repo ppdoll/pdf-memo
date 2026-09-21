@@ -1,0 +1,30 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+dev-dist/
+coverage/
+*.tsbuildinfo
+
+# tooling caches
+.turbo/
+.vercel/
+.eslintcache
+
+# env
+.env
+.env.*
+!.env.example
+
+# claude code (launch.json은 공유)
+.claude/*
+!.claude/launch.json
+
+# os / editor
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/*
+!.vscode/extensions.json

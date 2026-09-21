@@ -1,0 +1,9 @@
+{
+  "name": "@pdf-memo/config",
+  "version": "0.1.0",
+  "private": true,
+  "description": "공용 tsconfig 등 빌드 설정",
+  "files": [
+    "tsconfig.base.json"
+  ]
+}
