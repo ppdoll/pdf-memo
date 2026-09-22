@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 
 interface ViewerToolbarProps {
@@ -13,6 +13,8 @@ interface ViewerToolbarProps {
   onZoomOut: () => void;
   onFitWidth: () => void;
   onActualSize: () => void;
+  /** 오른쪽 끝에 붙는 추가 컨트롤 (내보내기 메뉴 등) */
+  trailing?: ReactNode;
 }
 
 const iconButton =
@@ -30,6 +32,7 @@ export function ViewerToolbar({
   onZoomOut,
   onFitWidth,
   onActualSize,
+  trailing,
 }: ViewerToolbarProps) {
   const [pageInput, setPageInput] = useState(String(currentPage + 1));
 
@@ -119,6 +122,7 @@ export function ViewerToolbar({
           폭 맞춤
         </button>
       </div>
+      {trailing}
     </header>
   );
 }

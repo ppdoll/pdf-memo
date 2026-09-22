@@ -8,9 +8,18 @@ interface DocumentCardProps {
   doc: PdfDocument;
   onRename: (doc: PdfDocument) => void;
   onTrash: (doc: PdfDocument) => void;
+  onExport: (doc: PdfDocument) => void;
+  /** 이 문서를 내보내는 중이면 true */
+  exporting?: boolean;
 }
 
-export function DocumentCard({ doc, onRename, onTrash }: DocumentCardProps) {
+export function DocumentCard({
+  doc,
+  onRename,
+  onTrash,
+  onExport,
+  exporting = false,
+}: DocumentCardProps) {
   return (
     <li className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:border-indigo-300 hover:shadow-sm">
       <Link to={`/d/${doc.id}`} className="block">
@@ -28,7 +37,20 @@ export function DocumentCard({ doc, onRename, onTrash }: DocumentCardProps) {
           </p>
         </div>
       </Link>
-      <div className="absolute top-2 right-2 flex gap-1 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
+      <div
+        className={`absolute top-2 right-2 flex gap-1 transition focus-within:opacity-100 group-hover:opacity-100 ${
+          exporting ? 'opacity-100' : 'opacity-0'
+        }`}
+      >
+        <button
+          type="button"
+          onClick={() => onExport(doc)}
+          disabled={exporting}
+          className="rounded-md bg-white/90 px-2 py-1 text-xs text-slate-600 shadow hover:text-indigo-700 disabled:opacity-60"
+          title="필기 포함 PDF 저장"
+        >
+          {exporting ? '내보내는 중…' : 'PDF'}
+        </button>
         <button
           type="button"
           onClick={() => onRename(doc)}

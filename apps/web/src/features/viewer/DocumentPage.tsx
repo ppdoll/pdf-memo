@@ -10,6 +10,7 @@ import {
   useToolStore,
   type Tool,
 } from '../annotate/toolStore';
+import { ExportMenu } from '../export/ExportMenu';
 import { libraryService } from '../library/service';
 import { stepZoom } from './layout';
 import { PdfViewer, type PdfViewerHandle, type ZoomSetting } from './PdfViewer';
@@ -167,6 +168,7 @@ function DocumentViewer({ doc, blob }: { doc: PdfDocument; blob: Blob | null }) 
         onZoomOut={() => zoomBy(-1)}
         onFitWidth={() => setZoom({ mode: 'fit-width' })}
         onActualSize={() => setZoom({ mode: 'fixed', scale: 1 })}
+        trailing={<ExportMenu documentId={doc.id} beforeExport={() => session.flush()} />}
       />
       <AnnotationToolbar session={session} />
       <div className="relative min-h-0 flex-1">

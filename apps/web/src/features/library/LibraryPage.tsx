@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Link, useParams } from 'react-router';
 import { useSubscribable } from '../../lib/useSubscribable';
 import { storage } from '../../storage';
+import { useExport } from '../export/useExport';
 import { DocumentCard } from './DocumentCard';
 import { FolderGrid } from './FolderGrid';
 import { Dropzone } from './import/Dropzone';
@@ -25,6 +26,7 @@ export function LibraryPage() {
   const { items, importFiles, dismiss, clearFinished } = useImportQueue();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const exporter = useExport();
 
   const isRoot = folderId === ROOT_FOLDER_ID;
   const title = isRoot ? '내 문서' : (path[path.length - 1]?.name ?? '폴더');
@@ -75,6 +77,10 @@ export function LibraryPage() {
   function onTrashDocument(doc: PdfDocument) {
     if (!window.confirm(`"${doc.title}" 문서를 휴지통으로 보낼까요?`)) return;
     void run(() => libraryService.trashDocument(doc.id));
+  }
+
+  function onExportDocument(doc: PdfDocument) {
+    void exporter.run(doc.id, 'flattened', 'download');
   }
 
   function onPickFiles(event: ChangeEvent<HTMLInputElement>) {
@@ -141,6 +147,20 @@ export function LibraryPage() {
             </div>
           </div>
           {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+          {(exporter.state.busy || exporter.state.info || exporter.state.error) && (
+            <p
+              className={`mt-2 text-sm ${
+                exporter.state.error
+                  ? 'text-red-600'
+                  : exporter.state.busy
+                    ? 'text-amber-600'
+                    : 'text-emerald-600'
+              }`}
+              role="status"
+            >
+              {exporter.state.error ?? exporter.state.progress ?? exporter.state.info}
+            </p>
+          )}
         </header>
 
         {isRoot && <RecentDocuments />}
@@ -159,6 +179,8 @@ export function LibraryPage() {
                   doc={doc}
                   onRename={onRenameDocument}
                   onTrash={onTrashDocument}
+                  onExport={onExportDocument}
+                  exporting={exporter.state.busy && exporter.state.documentId === doc.id}
                 />
               ))}
             </ul>
