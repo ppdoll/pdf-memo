@@ -44,7 +44,8 @@ async function renderThumbnail(doc: PDFDocumentProxy): Promise<PdfThumbnail | nu
     const canvas = document.createElement('canvas');
     canvas.width = Math.ceil(viewport.width);
     canvas.height = Math.ceil(viewport.height);
-    await page.render({ canvas, viewport }).promise;
+    // intent 'print': rAF 대신 타이머로 진행하므로 백그라운드 탭에서도 썸네일 렌더가 멈추지 않는다
+    await page.render({ canvas, viewport, intent: 'print' }).promise;
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, 'image/jpeg', 0.82),
     );
