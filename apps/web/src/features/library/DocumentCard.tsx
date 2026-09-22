@@ -1,4 +1,4 @@
-import type { PdfDocument } from '@pdf-memo/shared';
+import { documentKind, type PdfDocument } from '@pdf-memo/shared';
 import { Link } from 'react-router';
 import { formatRelative } from '../../lib/format';
 import { formatBytes } from '../../lib/quota';
@@ -20,11 +20,13 @@ export function DocumentCard({
   onExport,
   exporting = false,
 }: DocumentCardProps) {
+  const isJson = documentKind(doc) === 'json';
   return (
     <li className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:border-indigo-300 hover:shadow-sm">
       <Link to={`/d/${doc.id}`} className="block">
         <Thumbnail
           assetId={doc.thumbnailAssetId}
+          kind={isJson ? 'json' : 'pdf'}
           alt=""
           className="h-40 w-full border-b border-slate-100"
         />
@@ -33,7 +35,8 @@ export function DocumentCard({
             {doc.title}
           </p>
           <p className="mt-1 text-xs text-slate-500">
-            {doc.pageCount}쪽 · {formatBytes(doc.byteSize)} · {formatRelative(doc.updatedAt)}
+            {isJson ? 'JSON' : `${doc.pageCount}쪽`} · {formatBytes(doc.byteSize)} ·{' '}
+            {formatRelative(doc.updatedAt)}
           </p>
         </div>
       </Link>
@@ -42,15 +45,17 @@ export function DocumentCard({
           exporting ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        <button
-          type="button"
-          onClick={() => onExport(doc)}
-          disabled={exporting}
-          className="rounded-md bg-white/90 px-2 py-1 text-xs text-slate-600 shadow hover:text-indigo-700 disabled:opacity-60"
-          title="필기 포함 PDF 저장"
-        >
-          {exporting ? '내보내는 중…' : 'PDF'}
-        </button>
+        {!isJson && (
+          <button
+            type="button"
+            onClick={() => onExport(doc)}
+            disabled={exporting}
+            className="rounded-md bg-white/90 px-2 py-1 text-xs text-slate-600 shadow hover:text-indigo-700 disabled:opacity-60"
+            title="필기 포함 PDF 저장"
+          >
+            {exporting ? '내보내는 중…' : 'PDF'}
+          </button>
+        )}
         <button
           type="button"
           onClick={() => onRename(doc)}

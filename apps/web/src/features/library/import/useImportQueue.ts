@@ -2,8 +2,10 @@ import { newId } from '@pdf-memo/shared';
 import { useCallback, useRef, useState } from 'react';
 import { storage } from '../../../storage';
 import { HEIC_MESSAGE, imagesTitle, isHeicFile, isImageFile } from '../../import/images/detect';
+import { isJsonFile } from '../../import/json/detect';
 import { isMarkdownFile } from '../../import/markdown/detect';
 import { analyzePdf } from '../../viewer/pdf/analyze';
+import { importJsonFile } from './importJson';
 import { importPdfFile, type ImportOutcome, type ImportStage } from './importPdf';
 
 export interface ImportItem {
@@ -83,6 +85,16 @@ export function useImportQueue() {
     try {
       while (queueRef.current.length > 0) {
         const job = queueRef.current.shift() as ImportJob;
+        if (job.files.length === 1 && isJsonFile(job.files[0])) {
+          // JSON은 PDF로 바꾸지 않고 그대로 저장해 트리 뷰어로 연다
+          const jsonOutcome = await importJsonFile(job.files[0], {
+            storage,
+            folderId: job.folderId,
+            onStage: (stage) => patch(job.item.id, { stage }),
+          });
+          patch(job.item.id, { outcome: jsonOutcome });
+          continue;
+        }
         let source: PdfSource;
         try {
           source = await toPdfSource(job.files, (stage) => patch(job.item.id, { stage }));

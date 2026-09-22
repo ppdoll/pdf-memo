@@ -1,4 +1,4 @@
-import { ROOT_FOLDER_ID, type PdfDocument } from '@pdf-memo/shared';
+import { ROOT_FOLDER_ID, documentKind, type PdfDocument } from '@pdf-memo/shared';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { storage } from '../../storage';
@@ -11,6 +11,7 @@ import {
   type Tool,
 } from '../annotate/toolStore';
 import { ExportMenu } from '../export/ExportMenu';
+import { JsonDocumentPage } from '../json/JsonDocumentPage';
 import { libraryService } from '../library/service';
 import { useSelectionStore } from '../text/selectionStore';
 import { stepZoom } from './layout';
@@ -79,6 +80,7 @@ export function DocumentPage() {
       </ViewerMessage>
     );
   }
+  if (documentKind(doc) === 'json') return <JsonDocumentPage doc={doc} blob={blob} />;
   return <DocumentViewer doc={doc} blob={blob} />;
 }
 

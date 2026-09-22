@@ -6,10 +6,12 @@ interface ThumbnailProps {
   assetId: string | null;
   alt: string;
   className?: string;
+  /** 자리표시자 모양 */
+  kind?: 'pdf' | 'json';
 }
 
 /** 저장된 썸네일 Asset을 표시. 없으면 PDF 아이콘 자리표시자 */
-export function Thumbnail({ assetId, alt, className = '' }: ThumbnailProps) {
+export function Thumbnail({ assetId, alt, className = '', kind = 'pdf' }: ThumbnailProps) {
   const [blob, setBlob] = useState<Blob | null>(null);
 
   useEffect(() => {
@@ -35,17 +37,21 @@ export function Thumbnail({ assetId, alt, className = '' }: ThumbnailProps) {
         className={`flex items-center justify-center bg-slate-100 text-slate-300 ${className}`}
         aria-hidden
       >
-        <svg
-          viewBox="0 0 24 24"
-          className="h-10 w-10"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-        >
-          <path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
-          <path d="M14 3v5h5" />
-          <path d="M9 13h6M9 17h6" />
-        </svg>
+        {kind === 'json' ? (
+          <span className="font-mono text-3xl font-semibold text-amber-400">{'{ }'}</span>
+        ) : (
+          <svg
+            viewBox="0 0 24 24"
+            className="h-10 w-10"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          >
+            <path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+            <path d="M14 3v5h5" />
+            <path d="M9 13h6M9 17h6" />
+          </svg>
+        )}
       </div>
     );
   }

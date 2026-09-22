@@ -111,6 +111,29 @@ export class LibraryService {
     await this.storage.folders.put({ ...folder, name: next.slice(0, 200) });
   }
 
+  /** 폴더 아이콘(색·이미지). 다른 폴더가 쓰지 않는 옛 아이콘 이미지는 지운다 */
+  async setFolderIcon(
+    folderId: string,
+    patch: { color?: string | null; iconAssetId?: string | null },
+  ): Promise<void> {
+    const folder = await this.storage.folders.get(folderId);
+    if (!folder) return;
+    const next = {
+      ...folder,
+      color: patch.color === undefined ? (folder.color ?? null) : patch.color,
+      iconAssetId:
+        patch.iconAssetId === undefined ? (folder.iconAssetId ?? null) : patch.iconAssetId,
+    };
+    await this.storage.folders.put(next);
+    const previous = folder.iconAssetId ?? null;
+    if (previous && previous !== next.iconAssetId) {
+      const stillUsed = (await this.storage.folders.all()).some(
+        (f) => f.id !== folderId && (f.iconAssetId ?? null) === previous,
+      );
+      if (!stillUsed) await this.storage.assets.remove(previous);
+    }
+  }
+
   /** 문서를 열었을 때. 동기화 대상이 아닌 보기 상태라 rev·outbox를 건드리지 않는다 */
   markOpened(documentId: string): Promise<void> {
     return this.storage.documents.updateViewState(documentId, { lastOpenedAt: nowIso() });

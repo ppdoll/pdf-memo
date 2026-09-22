@@ -11,6 +11,7 @@ import { FolderGrid } from './FolderGrid';
 import { Dropzone } from './import/Dropzone';
 import { ImportProgress } from './import/ImportProgress';
 import { isImageFile } from '../import/images/detect';
+import { FolderIconEditor, type FolderIconPatch } from './FolderIconEditor';
 import { ImageImportChoice } from './import/ImageImportChoice';
 import { useImportQueue } from './import/useImportQueue';
 import { RecentDocuments } from './RecentDocuments';
@@ -29,6 +30,8 @@ export function LibraryPage() {
   const { items, importFiles, dismiss, clearFinished } = useImportQueue();
   /** 한 번에 넣은 이미지가 2장 이상이면 묶을지 물어본다 */
   const [pendingImages, setPendingImages] = useState<File[] | null>(null);
+  /** 아이콘을 편집 중인 폴더 */
+  const [iconFolderId, setIconFolderId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const exporter = useExport();
@@ -102,6 +105,8 @@ export function LibraryPage() {
     handleFiles(files);
   }
 
+  const iconFolder = iconFolderId ? (folders.find((f) => f.id === iconFolderId) ?? null) : null;
+
   const empty = folders.length === 0 && documents.length === 0;
 
   return (
@@ -145,7 +150,7 @@ export function LibraryPage() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                title="PDF, 마크다운(.md), 텍스트(.txt), 이미지(JPEG·PNG 등) 파일을 가져옵니다"
+                title="PDF, 마크다운(.md), 텍스트(.txt), JSON, 이미지(JPEG·PNG 등) 파일을 가져옵니다"
                 className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
               >
                 가져오기
@@ -153,7 +158,7 @@ export function LibraryPage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="application/pdf,.pdf,.md,.markdown,.txt,text/markdown,text/plain,image/*"
+                accept="application/pdf,.pdf,.md,.markdown,.txt,text/markdown,text/plain,.json,application/json,image/*"
                 multiple
                 hidden
                 onChange={onPickFiles}
@@ -181,7 +186,12 @@ export function LibraryPage() {
 
         {isRoot && <RecentDocuments />}
 
-        <FolderGrid folders={folders} onRename={onRenameFolder} onTrash={onTrashFolder} />
+        <FolderGrid
+          folders={folders}
+          onRename={onRenameFolder}
+          onTrash={onTrashFolder}
+          onCustomize={(folder) => setIconFolderId(folder.id)}
+        />
 
         {documents.length > 0 && (
           <section>
@@ -206,7 +216,7 @@ export function LibraryPage() {
         {empty && (
           <div className="rounded-2xl border-2 border-dashed border-slate-300 px-6 py-16 text-center">
             <p className="text-sm text-slate-600">
-              PDF·마크다운(.md)·이미지 파일을 여기에 끌어다 놓거나 "가져오기"를 누르세요.
+              PDF·마크다운(.md)·JSON·이미지 파일을 여기에 끌어다 놓거나 "가져오기"를 누르세요.
             </p>
             <p className="mt-1 text-xs text-slate-400">
               파일은 이 브라우저 안에만 저장되고 서버로 올라가지 않습니다.
@@ -215,6 +225,15 @@ export function LibraryPage() {
         )}
       </div>
 
+      {iconFolder && (
+        <FolderIconEditor
+          folder={iconFolder}
+          onChange={(patch: FolderIconPatch) =>
+            run(() => libraryService.setFolderIcon(iconFolder.id, patch))
+          }
+          onClose={() => setIconFolderId(null)}
+        />
+      )}
       {pendingImages && (
         <ImageImportChoice
           count={pendingImages.length}

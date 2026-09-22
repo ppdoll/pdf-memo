@@ -17,6 +17,8 @@ export const FolderSchema = BaseEntitySchema.extend({
   parentId: z.string().min(1),
   name: z.string().trim().min(1).max(200),
   color: HexColorSchema.nullable(),
+  /** 폴더 아이콘 이미지 (Asset kind 'icon'). 없거나 null이면 color 네모를 그린다 */
+  iconAssetId: z.string().nullable().optional(),
   /** fractional index. 같은 부모 안에서의 수동 정렬 순서 */
   sortKey: z.string().min(1),
 });

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { IsoDateTimeSchema } from './base';
 
-export const AssetKindSchema = z.enum(['sticker', 'image', 'thumbnail']);
+export const AssetKindSchema = z.enum(['sticker', 'image', 'thumbnail', 'icon']);
 export type AssetKind = z.infer<typeof AssetKindSchema>;
 
 /**

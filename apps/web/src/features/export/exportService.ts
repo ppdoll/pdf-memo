@@ -1,4 +1,4 @@
-import type { AnnotationObject } from '@pdf-memo/shared';
+import { documentKind, type AnnotationObject } from '@pdf-memo/shared';
 import type { Storage } from '../../storage/ports';
 import { isPackAssetId } from '../sticker/pack';
 import { loadTextFontBytes } from '../text/font';
@@ -43,6 +43,11 @@ export async function exportDocument(
   if (!doc) throw new Error('문서를 찾을 수 없습니다');
   const blob = await storage.blobs.get(doc.blobHash);
   if (!blob) throw new Error('PDF 원본을 찾을 수 없습니다');
+
+  if (documentKind(doc) === 'json') {
+    const jsonName = `${sanitizeFileName(doc.title)}.json`;
+    return { file: new File([blob], jsonName, { type: 'application/json' }), drawn: 0, skipped: 0 };
+  }
 
   const name = exportFileName(doc.title, kind);
   if (kind === 'original') {

@@ -5,7 +5,7 @@ const STAGE_LABEL: Record<ImportItem['stage'], string> = {
   queued: '대기 중',
   converting: 'PDF로 변환 중',
   hashing: '중복 확인 중',
-  analyzing: '페이지 분석 중',
+  analyzing: '내용 분석 중',
   saving: '저장 중',
 };
 
