@@ -33,6 +33,8 @@ import { isInkTool, useToolStore, type Tool } from './toolStore';
 import { createNoteObject, createTextObject } from '../text/model';
 import { useSelectionStore } from '../text/selectionStore';
 import { TextLayer } from '../text/TextLayer';
+import { createImageObject } from '../sticker/model';
+import { StickerLayer } from '../sticker/StickerLayer';
 import { bboxContainsPoint } from '@pdf-memo/shared';
 import type { TextObject } from '@pdf-memo/shared';
 
@@ -217,7 +219,7 @@ export function AnnotationLayer({
       const hit =
         object.type === 'ink'
           ? inkHit(object.points, object.width, p, eraserRadius)
-          : (object.type === 'text' || object.type === 'note') &&
+          : (object.type === 'text' || object.type === 'note' || object.type === 'image') &&
             bboxContainsPoint(bboxExpand(object.bbox, eraserRadius), p);
       if (hit) {
         stroke.erased.set(object.id, object);
@@ -227,7 +229,7 @@ export function AnnotationLayer({
     if (changed) setHidden(new Set(stroke.erased.keys()));
   }
 
-  /** 텍스트·노트 도구: 탭한 자리에 객체를 만든다. 편집 중이던 탭은 편집을 끝내는 데만 쓴다 */
+  /** 텍스트·노트·스티커 도구: 탭한 자리에 객체를 만든다. 편집 중이던 탭은 편집을 끝내는 데만 쓴다 */
   function placeAt(p: Point, wasEditing: boolean) {
     const selection = useSelectionStore.getState();
     selection.select(null);
@@ -257,6 +259,19 @@ export function AnnotationLayer({
       session.commit('노트', [{ kind: 'add', object: note }]);
       selection.select({ pageIndex, id: note.id });
       selection.setEditing(note.id);
+    } else if (tool === 'sticker') {
+      const ref = useToolStore.getState().sticker.active;
+      if (!ref) return;
+      const image = createImageObject(
+        session.documentId,
+        pageIndex,
+        session.nextZ(pageIndex),
+        p,
+        ref,
+        pageSize,
+      );
+      session.commit('스티커', [{ kind: 'add', object: image }]);
+      selection.select({ pageIndex, id: image.id });
     }
   }
 
@@ -265,7 +280,7 @@ export function AnnotationLayer({
   }
 
   function onPointerDown(event: ReactPointerEvent<HTMLCanvasElement>) {
-    if (tool === 'text' || tool === 'note') {
+    if (tool === 'text' || tool === 'note' || tool === 'sticker') {
       if (!interactive || (event.pointerType === 'mouse' && event.button !== 0)) return;
       if (event.pointerType === 'touch' && !event.isPrimary) return;
       tapRef.current = {
@@ -399,7 +414,7 @@ export function AnnotationLayer({
         ? 'cell'
         : tool === 'text'
           ? 'text'
-          : tool === 'note'
+          : tool === 'note' || tool === 'sticker'
             ? 'copy'
             : 'crosshair';
 
@@ -439,6 +454,15 @@ export function AnnotationLayer({
         aria-label={`${pageIndex + 1}페이지 필기 영역`}
         role="img"
         data-ink-settings={inkSettings ? `${inkSettings.color}/${inkSettings.width}` : undefined}
+      />
+      <StickerLayer
+        session={session}
+        pageIndex={pageIndex}
+        pageSize={pageSize}
+        scale={scale}
+        matrix={matrix}
+        objects={objects}
+        interactive={interactive}
       />
       <TextLayer
         session={session}

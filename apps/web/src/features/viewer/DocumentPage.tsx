@@ -25,6 +25,7 @@ const TOOL_KEYS: Record<string, Tool> = {
   e: 'eraser',
   t: 'text',
   n: 'note',
+  s: 'sticker',
   v: 'hand',
 };
 

@@ -1,9 +1,10 @@
 import type { InkTool } from '@pdf-memo/shared';
 import { create } from 'zustand';
 import type { Storage } from '../../storage/ports';
+import { RECENT_STICKERS_MAX, type StickerRef } from '../sticker/model';
 import type { TextAlign, TextDefaults } from '../text/model';
 
-export type Tool = InkTool | 'eraser' | 'hand' | 'text' | 'note';
+export type Tool = InkTool | 'eraser' | 'hand' | 'text' | 'note' | 'sticker';
 
 export interface InkSettings {
   color: string;
@@ -12,6 +13,13 @@ export interface InkSettings {
 
 export interface NoteDefaults {
   color: string;
+}
+
+export interface StickerSettings {
+  /** 지금 붙일 스티커. null이면 탭해도 아무것도 붙지 않는다 */
+  active: StickerRef | null;
+  /** 최근 사용, 앞이 최신 */
+  recent: StickerRef[];
 }
 
 export interface ToolSnapshot {
@@ -26,6 +34,7 @@ export interface ToolSnapshot {
   text: TextDefaults;
   /** 새 스티키 노트의 색 */
   note: NoteDefaults;
+  sticker: StickerSettings;
 }
 
 interface ToolState extends ToolSnapshot {
@@ -35,6 +44,8 @@ interface ToolState extends ToolSnapshot {
   setFingerDraws(value: boolean): void;
   setText(patch: Partial<TextDefaults>): void;
   setNote(patch: Partial<NoteDefaults>): void;
+  /** 붙일 스티커를 고른다. 고르면 최근 목록 맨 앞에 넣는다 */
+  setSticker(ref: StickerRef | null): void;
   hydrate(snapshot: Partial<ToolSnapshot>): void;
 }
 
@@ -47,6 +58,7 @@ export const DEFAULT_TOOLS: ToolSnapshot = {
   fingerDraws: false,
   text: { color: '#1f2937', fontSize: 14, background: null, align: 'left' },
   note: { color: '#fde047' },
+  sticker: { active: null, recent: [] },
 };
 
 export const INK_COLORS: Record<InkTool, string[]> = {
@@ -64,7 +76,7 @@ export const INK_WIDTHS: Record<InkTool, number[]> = {
 
 export const ERASER_RADII = [4, 8, 16];
 
-const TOOLS: Tool[] = ['pen', 'highlighter', 'marker', 'eraser', 'hand', 'text', 'note'];
+const TOOLS: Tool[] = ['pen', 'highlighter', 'marker', 'eraser', 'hand', 'text', 'note', 'sticker'];
 const ALIGNS: TextAlign[] = ['left', 'center', 'right'];
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -103,6 +115,27 @@ function sanitizeNote(value: unknown, fallback: NoteDefaults): NoteDefaults {
   return { color: isHex(v.color) ? v.color : fallback.color };
 }
 
+function sanitizeStickerRef(value: unknown): StickerRef | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const v = value as Partial<StickerRef>;
+  if (typeof v.assetId !== 'string' || v.assetId.length === 0) return null;
+  if (typeof v.width !== 'number' || !(v.width > 0)) return null;
+  if (typeof v.height !== 'number' || !(v.height > 0)) return null;
+  return { assetId: v.assetId, width: v.width, height: v.height };
+}
+
+function sanitizeSticker(value: unknown, fallback: StickerSettings): StickerSettings {
+  if (typeof value !== 'object' || value === null) return fallback;
+  const v = value as Partial<StickerSettings>;
+  const recent = Array.isArray(v.recent)
+    ? v.recent
+        .map(sanitizeStickerRef)
+        .filter((ref): ref is StickerRef => ref !== null)
+        .slice(0, RECENT_STICKERS_MAX)
+    : fallback.recent;
+  return { active: sanitizeStickerRef(v.active), recent };
+}
+
 /** 저장된 설정을 검증해 상태로 바꾼다 (손상된 값은 기본값으로) */
 export function sanitizeSnapshot(input: Partial<ToolSnapshot>): ToolSnapshot {
   return {
@@ -118,6 +151,7 @@ export function sanitizeSnapshot(input: Partial<ToolSnapshot>): ToolSnapshot {
       typeof input.fingerDraws === 'boolean' ? input.fingerDraws : DEFAULT_TOOLS.fingerDraws,
     text: sanitizeText(input.text, DEFAULT_TOOLS.text),
     note: sanitizeNote(input.note, DEFAULT_TOOLS.note),
+    sticker: sanitizeSticker(input.sticker, DEFAULT_TOOLS.sticker),
   };
 }
 
@@ -135,6 +169,15 @@ export const useToolStore = create<ToolState>()((set) => ({
   setFingerDraws: (fingerDraws) => set({ fingerDraws }),
   setText: (patch) => set((state) => ({ text: { ...state.text, ...patch } })),
   setNote: (patch) => set((state) => ({ note: { ...state.note, ...patch } })),
+  setSticker: (ref) =>
+    set((state) => {
+      if (!ref) return { sticker: { ...state.sticker, active: null } };
+      const recent = [ref, ...state.sticker.recent.filter((r) => r.assetId !== ref.assetId)].slice(
+        0,
+        RECENT_STICKERS_MAX,
+      );
+      return { sticker: { active: ref, recent } };
+    }),
   hydrate: (snapshot) => set(sanitizeSnapshot(snapshot)),
 }));
 
@@ -148,6 +191,7 @@ export function toolSnapshot(state: ToolSnapshot): ToolSnapshot {
     fingerDraws: state.fingerDraws,
     text: state.text,
     note: state.note,
+    sticker: state.sticker,
   };
 }
 

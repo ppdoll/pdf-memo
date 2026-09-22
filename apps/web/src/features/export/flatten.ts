@@ -1,21 +1,38 @@
-import type { AnnotationObject, InkObject, NoteObject, TextObject } from '@pdf-memo/shared';
-import type { PDFFont, PDFPage, RGB } from 'pdf-lib';
+import type {
+  AnnotationObject,
+  ImageObject,
+  InkObject,
+  NoteObject,
+  TextObject,
+} from '@pdf-memo/shared';
+import type { PDFDocument, PDFFont, PDFImage, PDFPage, RGB } from 'pdf-lib';
 import { inkOutline } from '../annotate/ink';
+import { pdfAnchors } from '../sticker/model';
+import { getPackSticker, isPackAssetId } from '../sticker/pack';
 import { NOTE_EXPANDED_WIDTH, NOTE_SIZE, TEXT_LINE_HEIGHT, TEXT_PADDING } from '../text/model';
 import { wrapText } from '../text/wrap';
 import { hexToRgb01, outlineToSvgPath } from './svgPath';
+
+export interface AssetBytes {
+  mime: string;
+  bytes: Uint8Array;
+}
+
+/** 이미지 객체가 참조하는 사용자 자산 (assetId → 바이트). 팩 스티커는 벡터라 필요 없다 */
+export type FlattenAssets = ReadonlyMap<string, AssetBytes>;
 
 export interface FlattenOptions {
   onProgress?: (donePages: number, totalPages: number) => void;
   /** 텍스트·노트를 그릴 때 임베드할 OTF/TTF 바이트. 없으면 텍스트 객체는 건너뛴다 */
   fontBytes?: Uint8Array;
+  assets?: FlattenAssets;
 }
 
 export interface FlattenResult {
   bytes: Uint8Array;
   /** PDF에 그려 넣은 객체 수 */
   drawn: number;
-  /** 아직 내보내기를 지원하지 않는 타입이거나 페이지·폰트가 없어 건너뛴 객체 수 */
+  /** 아직 내보내기를 지원하지 않는 타입이거나 페이지·폰트·자산이 없어 건너뛴 객체 수 */
   skipped: number;
 }
 
@@ -31,6 +48,8 @@ export const NOTE_FONT_SIZE = 11;
 /** 글줄 위에서 기준선까지의 근사 비율 (line-height 1.3, ascent ≈ 0.8em) */
 const BASELINE_RATIO = 0.8;
 
+type PdfLib = typeof import('pdf-lib');
+
 /**
  * 원본 PDF 위에 주석을 벡터로 굽는다(flatten).
  *
@@ -44,11 +63,11 @@ export async function flattenAnnotations(
   annotations: readonly AnnotationObject[],
   options: FlattenOptions = {},
 ): Promise<FlattenResult> {
-  const { PDFDocument, rgb, BlendMode } = await import('pdf-lib');
+  const lib = await import('pdf-lib');
 
-  let doc;
+  let doc: PDFDocument;
   try {
-    doc = await PDFDocument.load(original, { updateMetadata: false });
+    doc = await lib.PDFDocument.load(original, { updateMetadata: false });
   } catch (error) {
     if (error instanceof Error && /encrypt/i.test(error.message)) throw new EncryptedPdfError();
     throw error;
@@ -65,7 +84,13 @@ export async function flattenAnnotations(
     font = await doc.embedFont(options.fontBytes, { subset: true });
   }
 
-  const deps: DrawDeps = { rgb, multiply: BlendMode.Multiply, font };
+  const deps: DrawDeps = {
+    lib,
+    doc,
+    font,
+    assets: options.assets ?? new Map(),
+    images: new Map(),
+  };
   const pages = doc.getPages();
   let drawn = 0;
   let skipped = 0;
@@ -80,30 +105,31 @@ export async function flattenAnnotations(
     const crop = page.getCropBox();
     const origin = { x: crop.x, y: crop.y + crop.height };
     for (const object of objects) {
+      let ok = false;
       switch (object.type) {
         case 'ink':
           drawInk(page, object, origin, deps);
-          drawn += 1;
+          ok = true;
           break;
         case 'text':
           if (deps.font) {
             drawTextBox(page, object, origin, deps);
-            drawn += 1;
-          } else {
-            skipped += 1;
+            ok = true;
           }
           break;
         case 'note':
           if (deps.font) {
             drawNote(page, object, origin, deps);
-            drawn += 1;
-          } else {
-            skipped += 1;
+            ok = true;
           }
           break;
+        case 'image':
+          ok = await drawImageObject(page, object, origin, deps);
+          break;
         default:
-          skipped += 1;
       }
+      if (ok) drawn += 1;
+      else skipped += 1;
     }
     done += 1;
     options.onProgress?.(done, byPage.size);
@@ -132,9 +158,12 @@ export function groupByPage(
 }
 
 interface DrawDeps {
-  rgb: (r: number, g: number, b: number) => RGB;
-  multiply: import('pdf-lib').BlendMode;
+  lib: PdfLib;
+  doc: PDFDocument;
   font: PDFFont | null;
+  assets: FlattenAssets;
+  /** 한 번 임베드한 이미지는 다시 쓴다 (assetId → PDFImage) */
+  images: Map<string, PDFImage>;
 }
 
 interface Origin {
@@ -144,7 +173,7 @@ interface Origin {
 
 function toRgb(hex: string, deps: DrawDeps): RGB {
   const { r, g, b } = hexToRgb01(hex);
-  return deps.rgb(r, g, b);
+  return deps.lib.rgb(r, g, b);
 }
 
 function drawInk(page: PDFPage, ink: InkObject, origin: Origin, deps: DrawDeps) {
@@ -156,7 +185,7 @@ function drawInk(page: PDFPage, ink: InkObject, origin: Origin, deps: DrawDeps) 
     color: toRgb(ink.color, deps),
     opacity: ink.opacity,
     borderWidth: 0,
-    blendMode: ink.tool === 'highlighter' ? deps.multiply : undefined,
+    blendMode: ink.tool === 'highlighter' ? deps.lib.BlendMode.Multiply : undefined,
   });
 }
 
@@ -240,7 +269,7 @@ function drawNote(page: PDFPage, note: NoteObject, origin: Origin, deps: DrawDep
     width: NOTE_SIZE,
     height: NOTE_SIZE,
     color: fill,
-    borderColor: deps.rgb(0.35, 0.3, 0.1),
+    borderColor: deps.lib.rgb(0.35, 0.3, 0.1),
     borderWidth: 0.6,
   });
   if (note.collapsed || note.content.trim() === '') return;
@@ -263,8 +292,68 @@ function drawNote(page: PDFPage, note: NoteObject, origin: Origin, deps: DrawDep
     { x: boxX + TEXT_PADDING, y: note.y + TEXT_PADDING, innerWidth },
     NOTE_FONT_SIZE,
     'left',
-    deps.rgb(0.1, 0.1, 0.12),
+    deps.lib.rgb(0.1, 0.1, 0.12),
     origin,
     font,
   );
+}
+
+/**
+ * 스티커·이미지. 팩 스티커는 화면과 같은 path를 drawSvgPath로(벡터), 사용자 이미지는 PNG/JPEG XObject로 굽는다.
+ * 둘 다 중심을 축으로 회전한 결과가 되도록 기준점을 pdfAnchors로 계산한다.
+ */
+async function drawImageObject(
+  page: PDFPage,
+  image: ImageObject,
+  origin: Origin,
+  deps: DrawDeps,
+): Promise<boolean> {
+  const { degrees, LineCapStyle } = deps.lib;
+  const anchors = pdfAnchors(image, origin);
+
+  if (isPackAssetId(image.assetId)) {
+    const def = getPackSticker(image.assetId);
+    if (!def) return false;
+    const scale = image.w / def.width;
+    for (const shape of def.shapes) {
+      const alpha = (shape.opacity ?? 1) * image.opacity;
+      page.drawSvgPath(shape.d, {
+        x: anchors.svg.x,
+        y: anchors.svg.y,
+        scale,
+        rotate: degrees(anchors.rotateDeg),
+        color: shape.fill ? toRgb(shape.fill, deps) : undefined,
+        borderColor: shape.stroke ? toRgb(shape.stroke, deps) : undefined,
+        borderWidth: shape.stroke ? (shape.strokeWidth ?? 1) : 0,
+        borderLineCap: shape.lineCap === 'round' ? LineCapStyle.Round : undefined,
+        opacity: alpha,
+        borderOpacity: alpha,
+      });
+    }
+    return true;
+  }
+
+  let embedded = deps.images.get(image.assetId);
+  if (!embedded) {
+    const asset = deps.assets.get(image.assetId);
+    if (!asset) return false;
+    try {
+      embedded = /jpe?g$/i.test(asset.mime)
+        ? await deps.doc.embedJpg(asset.bytes)
+        : await deps.doc.embedPng(asset.bytes);
+    } catch (error) {
+      console.warn('[flatten] image skipped', image.assetId, error);
+      return false;
+    }
+    deps.images.set(image.assetId, embedded);
+  }
+  page.drawImage(embedded, {
+    x: anchors.image.x,
+    y: anchors.image.y,
+    width: image.w,
+    height: image.h,
+    rotate: degrees(anchors.rotateDeg),
+    opacity: image.opacity,
+  });
+  return true;
 }

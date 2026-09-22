@@ -11,6 +11,7 @@ import { dirname, join } from 'node:path';
 import { PDFDict, PDFDocument, PDFName, degrees, type PDFPage } from 'pdf-lib';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { describe, expect, it } from 'vitest';
+import { createImageObject, withImageGeometry } from '../../sticker/model';
 import { EncryptedPdfError, flattenAnnotations, groupByPage } from '../flatten';
 
 const DOC_ID = '01a0c69a-b833-7434-b143-ea94aec704b7';
@@ -61,6 +62,21 @@ function note(pageIndex: number): NoteObject {
 }
 
 const latin1 = (bytes: Uint8Array) => new TextDecoder('latin1').decode(bytes);
+
+const PAGE = { w: 612, h: 792, rotation: 0 as const };
+/** 1×1 PNG */
+const PNG_1X1 = new Uint8Array(
+  Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==',
+    'base64',
+  ),
+);
+
+function image(pageIndex: number, assetId: string, rotation: number) {
+  const ref = { assetId, width: 100, height: 100 };
+  const object = createImageObject(DOC_ID, pageIndex, 20, { x: 200, y: 300 }, ref, PAGE);
+  return withImageGeometry(object, { rotation }, PAGE);
+}
 
 /** 페이지 리소스의 ExtGState에 선언된 블렌드 모드 목록 */
 function blendModes(page: PDFPage): string[] {
@@ -171,6 +187,27 @@ describe('flattenAnnotations', () => {
     expect(extracted).toContain('english mixed text');
     expect(extracted).toContain('둘째 줄');
     await pdf.destroy();
+  });
+
+  it('draws pack stickers as vectors and user images as XObjects, skipping unknown assets', async () => {
+    const original = await makePdf();
+    const sticker = image(0, 'pack:basic/heart-red', 30);
+    const photo = image(0, 'f'.repeat(64), -15);
+    const missing = image(1, 'e'.repeat(64), 0);
+    const assets = new Map([[photo.assetId, { mime: 'image/png', bytes: PNG_1X1 }]]);
+    const result = await flattenAnnotations(original, [sticker, photo, missing], { assets });
+    expect(result.drawn).toBe(2);
+    expect(result.skipped).toBe(1);
+
+    const output = await PDFDocument.load(result.bytes);
+    const xobjects = output
+      .getPage(0)
+      .node.Resources()
+      ?.lookupMaybe(PDFName.of('XObject'), PDFDict);
+    expect(xobjects?.entries().length).toBe(1);
+    expect(
+      output.getPage(1).node.Resources()?.lookupMaybe(PDFName.of('XObject'), PDFDict),
+    ).toBeUndefined();
   });
 
   it('rejects encrypted PDFs with a readable error', async () => {
