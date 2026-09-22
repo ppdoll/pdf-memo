@@ -779,6 +779,7 @@ Hobby 개인 계정에서 대시보드 설정 없이 push만으로 동작하도�
 - 환경 변수(2단계): `DATABASE_URL`, `BLOB_*` 또는 `S3_*`, `AUTH_JWKS_URL`. 같은 오리진이므로 `WEB_ORIGIN`(CORS)은 프록시 없이 로컬 개발할 때만 필요하다.
 - pdf.js 워커 파일과 CJK 폰트는 정적 자산으로 포함(`Cache-Control: immutable`).
 - 주의: Vercel 함수는 요청 본문 4.5 MB 제한이 있으므로 2단계 PDF 업로드는 presigned URL로 스토리지에 직접 올린다(§10.2).
+- 프로덕션 URL: https://pdf-memo-web.vercel.app — Vercel 계정은 GitHub `ppdoll`로 로그인하는 `ppdoll-7834's projects` 팀(2026-09-22 첫 배포 성공). 배포 고유 URL(해시 포함)은 Deployment Protection 기본값으로 Vercel 로그인이 필요하고, 프로덕션 도메인만 공개다.
 
 ---
 

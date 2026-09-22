@@ -44,6 +44,9 @@ pnpm ci               # format:check + lint + build + typecheck + test
 GitHub `ppdoll/pdf-memo`를 Vercel에 한 번 import하면 된다. Root Directory는 비워 두고(저장소 루트),
 Framework Preset은 Other. 나머지는 루트 `vercel.json`이 지정한다.
 
+프로덕션 URL: https://pdf-memo-web.vercel.app (Vercel 팀 `ppdoll-7834's projects`, 프로젝트 `pdf-memo`).
+주의: Root Directory에 값이 들어가면 루트 `vercel.json`이 읽히지 않아 "No Output Directory named dist" 오류로 실패한다. 반드시 비워 둔다.
+
 | 경로     | 처리                                                          |
 | -------- | ------------------------------------------------------------- |
 | `/api/*` | `api/index.js` 함수 → NestJS (`apps/api/dist`)                |
