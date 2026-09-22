@@ -800,18 +800,18 @@ Hobby 개인 계정에서 대시보드 설정 없이 push만으로 동작하도�
 
 **Phase 0 — 기반 (1주)**
 
-- [ ] 모노레포 스캐폴딩(pnpm, turbo, shared, web, api), ESLint/Prettier, CI
-- [ ] GitHub 저장소, Vercel 프로젝트 2개, Preview 배포 확인
-- [ ] shared: 도메인 타입·zod 스키마 v1, Dexie 스키마 v1, StorageAdapter + 테스트
+- [x] 모노레포 스캐폴딩(pnpm, turbo, shared, web, api), ESLint/Prettier, CI
+- [x] GitHub 저장소, Vercel 프로젝트(단일, 루트), 배포 확인
+- [x] shared: 도메인 타입·zod 스키마 v1, Dexie 스키마 v1, StorageAdapter + 테스트
 
 **Phase 1 — MVP (3~4주)**
 
-- [ ] 라이브러리: 폴더 트리 CRUD, PDF 가져오기(드래그앤드롭·다중), 해시 중복 감지, 문서 카드·썸네일, 최근, 즐겨찾기, 휴지통
-- [ ] 뷰어: 가상 스크롤, 확대·이동, 마지막 페이지 기억
+- [x] 라이브러리(2026-09-22, 즐겨찾기는 후속): 폴더 트리 CRUD, PDF 가져오기(드래그앤드롭·다중), 해시 중복 감지, 문서 카드·썸네일, 최근, 즐겨찾기, 휴지통
+- [x] 뷰어(2026-09-22): 가상 스크롤, 확대·이동, 마지막 페이지 기억
 - [ ] 필기: 펜·형광펜·마커·지우개·텍스트·손, 압력, 팜 리젹션, Undo/Redo, 자동 저장 표시
 - [ ] 내보내기: 필기 포함 PDF(한글 폰트 임베드), 백업 zip + 복원
 - [ ] PWA: 매니페스트, 오프라인, 설치 배너, `persist()` 요청, 용량 게이지
-- [ ] api: health/meta 배포
+- [x] api: health/meta 배포
 
 **Phase 1.5 — 꾸미기·편의 (2~3주)**
 
