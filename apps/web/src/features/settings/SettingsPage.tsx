@@ -1,4 +1,6 @@
 import { requestPersistentStorage } from '../../lib/quota';
+import { ApiStatus } from '../status/ApiStatus';
+import { StorageStatus } from '../status/StorageStatus';
 
 export function SettingsPage() {
   return (
@@ -27,8 +29,13 @@ export function SettingsPage() {
         </button>
       </section>
 
+      <div className="grid gap-4 sm:grid-cols-2">
+        <StorageStatus />
+        <ApiStatus />
+      </div>
+
       <section className="rounded-xl border border-dashed border-slate-300 p-5 text-sm text-slate-500">
-        백업 내보내기·복원, 펜 기본값, 스티커 관리는 Phase 1에서 추가됩니다.
+        백업 내보내기·복원, 펜 기본값, 스티커 관리는 다음 단계에서 추가됩니다.
       </section>
     </div>
   );

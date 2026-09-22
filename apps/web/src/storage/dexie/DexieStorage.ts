@@ -15,7 +15,9 @@ import type {
   AssetStore,
   BlobStore,
   DocumentRepo,
+  DocumentViewState,
   FolderRepo,
+  ListOptions,
   OutboxEntity,
   OutboxEntry,
   OutboxStore,
@@ -113,8 +115,13 @@ class DexieRepo<T extends BaseEntity> implements Repo<T> {
 }
 
 class DexieFolderRepo extends DexieRepo<Folder> implements FolderRepo {
-  children(parentId: string): Promise<Folder[]> {
-    return this.table.where('parentId').equals(parentId).filter(isAlive).sortBy('sortKey');
+  children(parentId: string, options?: ListOptions): Promise<Folder[]> {
+    const query = this.table.where('parentId').equals(parentId);
+    return (options?.includeTrashed ? query : query.filter(isAlive)).sortBy('sortKey');
+  }
+
+  watchTrashed(): Subscribable<Folder[]> {
+    return liveQuery(() => this.trashed());
   }
 
   watchChildren(parentId: string): Subscribable<Folder[]> {
@@ -182,8 +189,9 @@ class DexieDocumentRepo extends DexieRepo<PdfDocument> implements DocumentRepo {
     return [this.table, this.db.outbox, this.db.pdfBlobs];
   }
 
-  inFolder(folderId: string): Promise<PdfDocument[]> {
-    return this.table.where('folderId').equals(folderId).filter(isAlive).sortBy('sortKey');
+  inFolder(folderId: string, options?: ListOptions): Promise<PdfDocument[]> {
+    const query = this.table.where('folderId').equals(folderId);
+    return (options?.includeTrashed ? query : query.filter(isAlive)).sortBy('sortKey');
   }
 
   watchInFolder(folderId: string): Subscribable<PdfDocument[]> {
@@ -192,6 +200,18 @@ class DexieDocumentRepo extends DexieRepo<PdfDocument> implements DocumentRepo {
 
   recent(limit: number): Promise<PdfDocument[]> {
     return this.table.orderBy('lastOpenedAt').reverse().filter(isAlive).limit(limit).toArray();
+  }
+
+  watchRecent(limit: number): Subscribable<PdfDocument[]> {
+    return liveQuery(() => this.recent(limit));
+  }
+
+  watchTrashed(): Subscribable<PdfDocument[]> {
+    return liveQuery(() => this.trashed());
+  }
+
+  async updateViewState(id: string, patch: Partial<DocumentViewState>): Promise<void> {
+    await this.table.update(id, patch);
   }
 
   byBlobHash(hash: string): Promise<PdfDocument[]> {

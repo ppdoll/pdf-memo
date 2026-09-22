@@ -17,6 +17,9 @@ export function AppLayout() {
             <NavLink to="/" end className={navClass}>
               라이브러리
             </NavLink>
+            <NavLink to="/trash" className={navClass}>
+              휴지통
+            </NavLink>
             <NavLink to="/settings" className={navClass}>
               설정
             </NavLink>

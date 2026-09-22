@@ -37,25 +37,41 @@ export interface Repo<T extends BaseEntity> {
   purge(id: string): Promise<void>;
 }
 
+export interface ListOptions {
+  /** 휴지통에 있는 항목도 포함 (계단식 삭제·복원용) */
+  includeTrashed?: boolean;
+}
+
 export interface FolderRepo extends Repo<Folder> {
-  /** 살아 있는 하위 폴더, sortKey 순 */
-  children(parentId: string): Promise<Folder[]>;
+  /** 하위 폴더, sortKey 순. 기본은 살아 있는 것만 */
+  children(parentId: string, options?: ListOptions): Promise<Folder[]>;
   watchChildren(parentId: string): Subscribable<Folder[]>;
   /** 루트 직속부터 해당 폴더까지의 경로 (루트 sentinel 제외) */
   path(id: string): Promise<Folder[]>;
   /** 순환·깊이 검증을 포함한 이동 */
   move(id: string, parentId: string): Promise<Folder>;
   trashed(): Promise<Folder[]>;
+  watchTrashed(): Subscribable<Folder[]>;
+}
+
+/** 동기화하지 않는 로컬 보기 상태 */
+export interface DocumentViewState {
+  lastViewedPage: number;
+  lastOpenedAt: string | null;
 }
 
 export interface DocumentRepo extends Repo<PdfDocument> {
-  inFolder(folderId: string): Promise<PdfDocument[]>;
+  inFolder(folderId: string, options?: ListOptions): Promise<PdfDocument[]>;
   watchInFolder(folderId: string): Subscribable<PdfDocument[]>;
   /** 최근 열어본 순. 한 번도 열지 않은 문서는 제외 */
   recent(limit: number): Promise<PdfDocument[]>;
+  watchRecent(limit: number): Subscribable<PdfDocument[]>;
   /** 같은 PDF를 다시 가져오는지 감지 */
   byBlobHash(hash: string): Promise<PdfDocument[]>;
   trashed(): Promise<PdfDocument[]>;
+  watchTrashed(): Subscribable<PdfDocument[]>;
+  /** 보기 상태만 갱신. rev·outbox를 건드리지 않아 동기화 대상이 아니다 */
+  updateViewState(id: string, patch: Partial<DocumentViewState>): Promise<void>;
 }
 
 export interface AnnotationRepo extends Repo<AnnotationObject> {

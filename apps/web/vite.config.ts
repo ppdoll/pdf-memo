@@ -34,7 +34,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        globPatterns: ['**/*.{js,mjs,css,html,svg,png,woff2}'],
         // API 요청은 SPA 폴백(index.html)으로 가로채지 않는다.
         navigateFallbackDenylist: [/^\/api\//],
       },
