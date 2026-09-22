@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Link, useParams } from 'react-router';
 import { useSubscribable } from '../../lib/useSubscribable';
 import { storage } from '../../storage';
+import { BackupReminder } from '../backup/BackupReminder';
 import { useExport } from '../export/useExport';
 import { DocumentCard } from './DocumentCard';
 import { FolderGrid } from './FolderGrid';
@@ -162,6 +163,8 @@ export function LibraryPage() {
             </p>
           )}
         </header>
+
+        {isRoot && <BackupReminder documentCount={documents.length} />}
 
         {isRoot && <RecentDocuments />}
 

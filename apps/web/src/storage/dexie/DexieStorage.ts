@@ -23,10 +23,12 @@ import type {
   OutboxStore,
   PdfBlobInfo,
   Repo,
+  SettingEntry,
   SettingsStore,
   Storage,
   StorageStats,
   Subscribable,
+  SyncStateStore,
 } from '../ports';
 import { PdfMemoDB } from './db';
 
@@ -166,6 +168,10 @@ class DexieFolderRepo extends DexieRepo<Folder> implements FolderRepo {
     return this.table.filter((f) => f.deletedAt !== null).toArray();
   }
 
+  all(): Promise<Folder[]> {
+    return this.table.toArray();
+  }
+
   protected override async beforePut(existing: Folder | undefined, saved: Folder): Promise<void> {
     if (existing || saved.parentId === ROOT_FOLDER_ID) return;
     const parentPath = await this.path(saved.parentId);
@@ -222,6 +228,10 @@ class DexieDocumentRepo extends DexieRepo<PdfDocument> implements DocumentRepo {
     return this.table.filter((d) => d.deletedAt !== null).toArray();
   }
 
+  all(): Promise<PdfDocument[]> {
+    return this.table.toArray();
+  }
+
   protected override async beforePut(
     existing: PdfDocument | undefined,
     saved: PdfDocument,
@@ -267,6 +277,10 @@ class DexieAnnotationRepo extends DexieRepo<AnnotationObject> implements Annotat
 
   forDocument(documentId: string): Promise<AnnotationObject[]> {
     return this.table.where('documentId').equals(documentId).filter(isAlive).toArray();
+  }
+
+  allForDocument(documentId: string): Promise<AnnotationObject[]> {
+    return this.table.where('documentId').equals(documentId).toArray();
   }
 
   bulkPut(objects: AnnotationObject[]): Promise<AnnotationObject[]> {
@@ -333,6 +347,10 @@ class DexieAssetStore implements AssetStore {
     return this.db.assets.where('kind').equals(kind).toArray();
   }
 
+  all(): Promise<Asset[]> {
+    return this.db.assets.toArray();
+  }
+
   remove(id: string): Promise<void> {
     return this.db.assets.delete(id);
   }
@@ -351,6 +369,22 @@ class DexieSettingsStore implements SettingsStore {
 
   remove(key: string): Promise<void> {
     return this.db.settings.delete(key);
+  }
+
+  all(): Promise<SettingEntry[]> {
+    return this.db.settings.toArray();
+  }
+}
+
+class DexieSyncStateStore implements SyncStateStore {
+  constructor(private readonly db: PdfMemoDB) {}
+
+  async get(key: string): Promise<string | undefined> {
+    return (await this.db.syncState.get(key))?.value;
+  }
+
+  async set(key: string, value: string): Promise<void> {
+    await this.db.syncState.put({ key, value });
   }
 }
 
@@ -378,6 +412,7 @@ export class DexieStorage implements Storage {
   readonly blobs: BlobStore;
   readonly assets: AssetStore;
   readonly settings: SettingsStore;
+  readonly syncState: SyncStateStore;
   readonly outbox: OutboxStore;
 
   constructor(dbName?: string) {
@@ -388,6 +423,7 @@ export class DexieStorage implements Storage {
     this.blobs = new DexieBlobStore(this.db);
     this.assets = new DexieAssetStore(this.db);
     this.settings = new DexieSettingsStore(this.db);
+    this.syncState = new DexieSyncStateStore(this.db);
     this.outbox = new DexieOutboxStore(this.db);
   }
 

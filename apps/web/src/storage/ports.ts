@@ -52,6 +52,8 @@ export interface FolderRepo extends Repo<Folder> {
   move(id: string, parentId: string): Promise<Folder>;
   trashed(): Promise<Folder[]>;
   watchTrashed(): Subscribable<Folder[]>;
+  /** 휴지통 포함 전체 (백업용) */
+  all(): Promise<Folder[]>;
 }
 
 /** 동기화하지 않는 로컬 보기 상태 */
@@ -72,6 +74,8 @@ export interface DocumentRepo extends Repo<PdfDocument> {
   watchTrashed(): Subscribable<PdfDocument[]>;
   /** 보기 상태만 갱신. rev·outbox를 건드리지 않아 동기화 대상이 아니다 */
   updateViewState(id: string, patch: Partial<DocumentViewState>): Promise<void>;
+  /** 휴지통 포함 전체 (백업용) */
+  all(): Promise<PdfDocument[]>;
 }
 
 export interface AnnotationRepo extends Repo<AnnotationObject> {
@@ -79,6 +83,8 @@ export interface AnnotationRepo extends Repo<AnnotationObject> {
   page(documentId: string, pageIndex: number): Promise<AnnotationObject[]>;
   watchPage(documentId: string, pageIndex: number): Subscribable<AnnotationObject[]>;
   forDocument(documentId: string): Promise<AnnotationObject[]>;
+  /** tombstone 포함 전체 (백업·동기화용) */
+  allForDocument(documentId: string): Promise<AnnotationObject[]>;
   bulkPut(objects: AnnotationObject[]): Promise<AnnotationObject[]>;
   /** 문서 물리 삭제 시 함께 지운다. 문서 tombstone이 서버에서 cascade하므로 개별 outbox 기록은 남기지 않는다 */
   purgeForDocument(documentId: string): Promise<number>;
@@ -110,13 +116,26 @@ export interface AssetStore {
   get(id: string): Promise<Asset | undefined>;
   put(asset: Asset): Promise<void>;
   list(kind: AssetMeta['kind']): Promise<Asset[]>;
+  all(): Promise<Asset[]>;
   remove(id: string): Promise<void>;
+}
+
+export interface SettingEntry {
+  key: string;
+  value: unknown;
 }
 
 export interface SettingsStore {
   get<T>(key: string): Promise<T | undefined>;
   set(key: string, value: unknown): Promise<void>;
   remove(key: string): Promise<void>;
+  all(): Promise<SettingEntry[]>;
+}
+
+/** 기기 로컬 동기화 상태 (deviceId, cursor 등). 백업에 포함하지 않는다 */
+export interface SyncStateStore {
+  get(key: string): Promise<string | undefined>;
+  set(key: string, value: string): Promise<void>;
 }
 
 export type OutboxEntity = 'folder' | 'document' | 'annotation' | 'asset';
@@ -156,6 +175,7 @@ export interface Storage {
   readonly blobs: BlobStore;
   readonly assets: AssetStore;
   readonly settings: SettingsStore;
+  readonly syncState: SyncStateStore;
   readonly outbox: OutboxStore;
   /** 여러 리포지토리 작업을 하나의 원자적 트랜잭션으로 묶는다 */
   transaction<T>(fn: () => Promise<T>): Promise<T>;
