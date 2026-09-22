@@ -12,6 +12,7 @@ import {
 } from '../annotate/toolStore';
 import { ExportMenu } from '../export/ExportMenu';
 import { libraryService } from '../library/service';
+import { useSelectionStore } from '../text/selectionStore';
 import { stepZoom } from './layout';
 import { PdfViewer, type PdfViewerHandle, type ZoomSetting } from './PdfViewer';
 import { usePdfDocument } from './usePdfDocument';
@@ -22,6 +23,8 @@ const TOOL_KEYS: Record<string, Tool> = {
   h: 'highlighter',
   m: 'marker',
   e: 'eraser',
+  t: 'text',
+  n: 'note',
   v: 'hand',
 };
 
@@ -125,6 +128,24 @@ function DocumentViewer({ doc, blob }: { doc: PdfDocument; blob: Blob | null }) 
       if (!mod && !event.altKey && TOOL_KEYS[key]) {
         useToolStore.getState().setTool(TOOL_KEYS[key]);
         return;
+      }
+      // 선택된 텍스트·노트: Delete/Backspace로 삭제, Escape로 선택 해제
+      const selection = useSelectionStore.getState();
+      if (selection.selected && !selection.editingId) {
+        if (event.key === 'Delete' || event.key === 'Backspace') {
+          const { pageIndex, id } = selection.selected;
+          const object = session.getPage(pageIndex).find((o) => o.id === id);
+          if (object) {
+            event.preventDefault();
+            session.commit('삭제', [{ kind: 'remove', object }]);
+          }
+          selection.select(null);
+          return;
+        }
+        if (event.key === 'Escape') {
+          selection.select(null);
+          return;
+        }
       }
       switch (event.key) {
         case 'ArrowLeft':

@@ -1,4 +1,5 @@
 import type { InkTool } from '@pdf-memo/shared';
+import { TextControls } from '../text/TextControls';
 import { useSessionStatus } from './hooks';
 import type { AnnotationSession } from './session';
 import {
@@ -15,6 +16,8 @@ const TOOL_BUTTONS: Array<{ tool: Tool; label: string; key: string }> = [
   { tool: 'highlighter', label: '형광펜', key: 'H' },
   { tool: 'marker', label: '마커', key: 'M' },
   { tool: 'eraser', label: '지우개', key: 'E' },
+  { tool: 'text', label: '텍스트', key: 'T' },
+  { tool: 'note', label: '노트', key: 'N' },
   { tool: 'hand', label: '손', key: 'V' },
 ];
 
@@ -124,6 +127,8 @@ export function AnnotationToolbar({ session }: AnnotationToolbarProps) {
           </div>
         </>
       )}
+
+      <TextControls session={session} />
 
       {tool === 'eraser' && (
         <div className="flex items-center gap-1" aria-label="지우개 크기">

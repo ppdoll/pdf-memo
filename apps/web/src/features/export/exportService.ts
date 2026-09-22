@@ -1,4 +1,5 @@
 import type { Storage } from '../../storage/ports';
+import { loadTextFontBytes } from '../text/font';
 import { flattenAnnotations, type FlattenOptions } from './flatten';
 
 export type ExportKind = 'original' | 'flattened';
@@ -48,7 +49,13 @@ export async function exportDocument(
 
   const annotations = await storage.annotations.forDocument(documentId);
   const original = new Uint8Array(await blob.arrayBuffer());
-  const { bytes, drawn, skipped } = await flattenAnnotations(original, annotations, options);
+  // 텍스트·노트가 있으면 화면과 같은 폰트를 임베드한다 (없으면 폰트를 내려받지 않는다)
+  const needsFont = annotations.some((o) => o.type === 'text' || o.type === 'note');
+  const fontBytes = options.fontBytes ?? (needsFont ? await loadTextFontBytes() : undefined);
+  const { bytes, drawn, skipped } = await flattenAnnotations(original, annotations, {
+    ...options,
+    fontBytes,
+  });
   // pdf-lib가 돌려준 뷰를 새 ArrayBuffer로 복사해 BlobPart 타입에 맞춘다
   const part = new Uint8Array(bytes);
   return { file: new File([part], name, { type: 'application/pdf' }), drawn, skipped };

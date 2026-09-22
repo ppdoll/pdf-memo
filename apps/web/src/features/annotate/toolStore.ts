@@ -1,12 +1,17 @@
 import type { InkTool } from '@pdf-memo/shared';
 import { create } from 'zustand';
 import type { Storage } from '../../storage/ports';
+import type { TextAlign, TextDefaults } from '../text/model';
 
-export type Tool = InkTool | 'eraser' | 'hand';
+export type Tool = InkTool | 'eraser' | 'hand' | 'text' | 'note';
 
 export interface InkSettings {
   color: string;
   width: number;
+}
+
+export interface NoteDefaults {
+  color: string;
 }
 
 export interface ToolSnapshot {
@@ -17,6 +22,10 @@ export interface ToolSnapshot {
   eraserRadius: number;
   /** 손가락으로도 그리기 (기본은 손가락 = 스크롤·확대) */
   fingerDraws: boolean;
+  /** 새 텍스트 상자의 서식 */
+  text: TextDefaults;
+  /** 새 스티키 노트의 색 */
+  note: NoteDefaults;
 }
 
 interface ToolState extends ToolSnapshot {
@@ -24,6 +33,8 @@ interface ToolState extends ToolSnapshot {
   setInk(tool: InkTool, patch: Partial<InkSettings>): void;
   setEraserRadius(radius: number): void;
   setFingerDraws(value: boolean): void;
+  setText(patch: Partial<TextDefaults>): void;
+  setNote(patch: Partial<NoteDefaults>): void;
   hydrate(snapshot: Partial<ToolSnapshot>): void;
 }
 
@@ -34,6 +45,8 @@ export const DEFAULT_TOOLS: ToolSnapshot = {
   marker: { color: '#ef4444', width: 6 },
   eraserRadius: 8,
   fingerDraws: false,
+  text: { color: '#1f2937', fontSize: 14, background: null, align: 'left' },
+  note: { color: '#fde047' },
 };
 
 export const INK_COLORS: Record<InkTool, string[]> = {
@@ -51,20 +64,43 @@ export const INK_WIDTHS: Record<InkTool, number[]> = {
 
 export const ERASER_RADII = [4, 8, 16];
 
-const TOOLS: Tool[] = ['pen', 'highlighter', 'marker', 'eraser', 'hand'];
+const TOOLS: Tool[] = ['pen', 'highlighter', 'marker', 'eraser', 'hand', 'text', 'note'];
+const ALIGNS: TextAlign[] = ['left', 'center', 'right'];
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
 export function isInkTool(tool: Tool): tool is InkTool {
   return tool === 'pen' || tool === 'highlighter' || tool === 'marker';
 }
 
+const isHex = (value: unknown): value is string => typeof value === 'string' && HEX.test(value);
+
 function sanitizeInk(value: unknown, fallback: InkSettings): InkSettings {
   if (typeof value !== 'object' || value === null) return fallback;
   const v = value as Partial<InkSettings>;
   return {
-    color: typeof v.color === 'string' && HEX.test(v.color) ? v.color : fallback.color,
+    color: isHex(v.color) ? v.color : fallback.color,
     width: typeof v.width === 'number' && v.width > 0 && v.width <= 64 ? v.width : fallback.width,
   };
+}
+
+function sanitizeText(value: unknown, fallback: TextDefaults): TextDefaults {
+  if (typeof value !== 'object' || value === null) return fallback;
+  const v = value as Partial<TextDefaults>;
+  return {
+    color: isHex(v.color) ? v.color : fallback.color,
+    fontSize:
+      typeof v.fontSize === 'number' && v.fontSize >= 6 && v.fontSize <= 96
+        ? v.fontSize
+        : fallback.fontSize,
+    background: v.background === null || isHex(v.background) ? v.background : fallback.background,
+    align: v.align && ALIGNS.includes(v.align) ? v.align : fallback.align,
+  };
+}
+
+function sanitizeNote(value: unknown, fallback: NoteDefaults): NoteDefaults {
+  if (typeof value !== 'object' || value === null) return fallback;
+  const v = value as Partial<NoteDefaults>;
+  return { color: isHex(v.color) ? v.color : fallback.color };
 }
 
 /** 저장된 설정을 검증해 상태로 바꾼다 (손상된 값은 기본값으로) */
@@ -80,6 +116,8 @@ export function sanitizeSnapshot(input: Partial<ToolSnapshot>): ToolSnapshot {
         : DEFAULT_TOOLS.eraserRadius,
     fingerDraws:
       typeof input.fingerDraws === 'boolean' ? input.fingerDraws : DEFAULT_TOOLS.fingerDraws,
+    text: sanitizeText(input.text, DEFAULT_TOOLS.text),
+    note: sanitizeNote(input.note, DEFAULT_TOOLS.note),
   };
 }
 
@@ -95,6 +133,8 @@ export const useToolStore = create<ToolState>()((set) => ({
     }),
   setEraserRadius: (eraserRadius) => set({ eraserRadius }),
   setFingerDraws: (fingerDraws) => set({ fingerDraws }),
+  setText: (patch) => set((state) => ({ text: { ...state.text, ...patch } })),
+  setNote: (patch) => set((state) => ({ note: { ...state.note, ...patch } })),
   hydrate: (snapshot) => set(sanitizeSnapshot(snapshot)),
 }));
 
@@ -106,6 +146,8 @@ export function toolSnapshot(state: ToolSnapshot): ToolSnapshot {
     marker: state.marker,
     eraserRadius: state.eraserRadius,
     fingerDraws: state.fingerDraws,
+    text: state.text,
+    note: state.note,
   };
 }
 

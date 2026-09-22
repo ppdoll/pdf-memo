@@ -3,12 +3,26 @@ import {
   createAnnotationBase,
   type InkObject,
   type NoteObject,
+  type TextObject,
 } from '@pdf-memo/shared';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import { PDFDict, PDFDocument, PDFName, degrees, type PDFPage } from 'pdf-lib';
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { describe, expect, it } from 'vitest';
 import { EncryptedPdfError, flattenAnnotations, groupByPage } from '../flatten';
 
 const DOC_ID = '01a0c69a-b833-7434-b143-ea94aec704b7';
+
+/** 화면과 같은 Pretendard 폰트를 node_modules에서 읽는다 */
+function loadFontBytes(): Uint8Array {
+  const require = createRequire(import.meta.url);
+  const packageDir = dirname(require.resolve('pretendard/package.json'));
+  return new Uint8Array(
+    readFileSync(join(packageDir, 'dist/public/static/Pretendard-Regular.otf')),
+  );
+}
 
 async function makePdf(): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
@@ -114,6 +128,49 @@ describe('flattenAnnotations', () => {
     const result = await flattenAnnotations(original, []);
     expect(result).toMatchObject({ drawn: 0, skipped: 0 });
     expect((await PDFDocument.load(result.bytes)).getPageCount()).toBe(2);
+  });
+
+  it('embeds the text font and draws text boxes and notes when font bytes are given', async () => {
+    const original = await makePdf();
+    const text: TextObject = {
+      ...createAnnotationBase(DOC_ID, 0, 3, [20, 20, 200, 40]),
+      schemaVersion: ANNOTATION_SCHEMA_VERSION,
+      type: 'text',
+      x: 20,
+      y: 20,
+      w: 200,
+      h: 40,
+      rotation: 0,
+      content: '한글 메모와 english mixed text\n둘째 줄',
+      fontFamily: 'Pretendard',
+      fontSize: 14,
+      color: '#1f2937',
+      align: 'center',
+      background: '#fef08a',
+    };
+    const result = await flattenAnnotations(original, [text, note(0), ink(0, 'pen')], {
+      fontBytes: loadFontBytes(),
+    });
+    expect(result.drawn).toBe(3);
+    expect(result.skipped).toBe(0);
+
+    const output = await PDFDocument.load(result.bytes);
+    const fonts = output.getPage(0).node.Resources()?.lookup(PDFName.of('Font'), PDFDict);
+    expect(fonts && fonts.entries().length > 0).toBe(true);
+    expect(result.bytes.byteLength).toBeGreaterThan(original.byteLength + 1000);
+
+    // pdf.js로 다시 읽어 임베드된 CID 폰트의 ToUnicode가 살아 있는지(텍스트 추출) 확인
+    const pdf = await getDocument({
+      data: result.bytes.slice(),
+      disableFontFace: true,
+      useSystemFonts: false,
+    }).promise;
+    const content = await (await pdf.getPage(1)).getTextContent();
+    const extracted = content.items.map((item) => ('str' in item ? item.str : '')).join(' ');
+    expect(extracted).toContain('한글 메모와');
+    expect(extracted).toContain('english mixed text');
+    expect(extracted).toContain('둘째 줄');
+    await pdf.destroy();
   });
 
   it('rejects encrypted PDFs with a readable error', async () => {

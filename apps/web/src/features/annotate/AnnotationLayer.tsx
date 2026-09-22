@@ -30,6 +30,11 @@ import { TOOL_PROFILES, drawInk, sizeCanvas, type InkLike } from './ink';
 import { penTracker } from './penTracker';
 import type { AnnotationSession } from './session';
 import { isInkTool, useToolStore, type Tool } from './toolStore';
+import { createNoteObject, createTextObject } from '../text/model';
+import { useSelectionStore } from '../text/selectionStore';
+import { TextLayer } from '../text/TextLayer';
+import { bboxContainsPoint } from '@pdf-memo/shared';
+import type { TextObject } from '@pdf-memo/shared';
 
 interface AnnotationLayerProps {
   session: AnnotationSession;
@@ -85,6 +90,17 @@ export function AnnotationLayer({
   objectsRef.current = objects;
   const frameRef = useRef(0);
   const [hidden, setHidden] = useState<ReadonlySet<string>>(EMPTY_HIDDEN);
+  /** 텍스트 도구로 방금 만든, 아직 커밋 전인 상자 */
+  const [draft, setDraft] = useState<TextObject | null>(null);
+  /** 텍스트·노트 도구의 탭 판정 (움직이면 취소) */
+  const tapRef = useRef<{
+    pointerId: number;
+    clientX: number;
+    clientY: number;
+    /** 탭 시작 시점에 텍스트를 편집 중이었으면 이 탭은 편집 종료로만 쓴다 */
+    wasEditing: boolean;
+  } | null>(null);
+  const TAP_MOVE_PX = 8;
 
   const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
   const matrix = useMemo(() => pageToDisplayMatrix(pageSize, scale), [pageSize, scale]);
@@ -197,8 +213,13 @@ export function AnnotationLayer({
     stroke.cursor = p;
     let changed = false;
     for (const object of objectsRef.current) {
-      if (object.type !== 'ink' || stroke.erased.has(object.id)) continue;
-      if (inkHit(object.points, object.width, p, eraserRadius)) {
+      if (stroke.erased.has(object.id)) continue;
+      const hit =
+        object.type === 'ink'
+          ? inkHit(object.points, object.width, p, eraserRadius)
+          : (object.type === 'text' || object.type === 'note') &&
+            bboxContainsPoint(bboxExpand(object.bbox, eraserRadius), p);
+      if (hit) {
         stroke.erased.set(object.id, object);
         changed = true;
       }
@@ -206,11 +227,55 @@ export function AnnotationLayer({
     if (changed) setHidden(new Set(stroke.erased.keys()));
   }
 
+  /** 텍스트·노트 도구: 탭한 자리에 객체를 만든다. 편집 중이던 탭은 편집을 끝내는 데만 쓴다 */
+  function placeAt(p: Point, wasEditing: boolean) {
+    const selection = useSelectionStore.getState();
+    selection.select(null);
+    if (wasEditing) return;
+    if (tool === 'text') {
+      const defaults = useToolStore.getState().text;
+      const created = createTextObject(
+        session.documentId,
+        pageIndex,
+        session.nextZ(pageIndex),
+        p,
+        pageSize,
+        defaults,
+      );
+      setDraft(created);
+      selection.select({ pageIndex, id: created.id });
+      selection.setEditing(created.id);
+    } else if (tool === 'note') {
+      const note = createNoteObject(
+        session.documentId,
+        pageIndex,
+        session.nextZ(pageIndex),
+        p,
+        pageSize,
+        useToolStore.getState().note.color,
+      );
+      session.commit('노트', [{ kind: 'add', object: note }]);
+      selection.select({ pageIndex, id: note.id });
+      selection.setEditing(note.id);
+    }
+  }
+
   function pressureOf(event: { pressure: number; pointerType: string }): number {
     return event.pressure > 0 ? event.pressure : 0.5;
   }
 
   function onPointerDown(event: ReactPointerEvent<HTMLCanvasElement>) {
+    if (tool === 'text' || tool === 'note') {
+      if (!interactive || (event.pointerType === 'mouse' && event.button !== 0)) return;
+      if (event.pointerType === 'touch' && !event.isPrimary) return;
+      tapRef.current = {
+        pointerId: event.pointerId,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        wasEditing: useSelectionStore.getState().editingId !== null,
+      };
+      return;
+    }
     if (strokeRef.current || !shouldStart(event)) return;
     event.preventDefault();
     event.stopPropagation();
@@ -238,6 +303,13 @@ export function AnnotationLayer({
   }
 
   function onPointerMove(event: ReactPointerEvent<HTMLCanvasElement>) {
+    const tap = tapRef.current;
+    if (tap && event.pointerId === tap.pointerId) {
+      if (Math.hypot(event.clientX - tap.clientX, event.clientY - tap.clientY) > TAP_MOVE_PX) {
+        tapRef.current = null;
+      }
+      return;
+    }
     const stroke = strokeRef.current;
     if (!stroke || event.pointerId !== stroke.pointerId) return;
     event.preventDefault();
@@ -257,6 +329,21 @@ export function AnnotationLayer({
       else appendPoint(stroke, p, pressureOf(sample));
     }
     scheduleDraw();
+  }
+
+  function onPointerUp(event: ReactPointerEvent<HTMLCanvasElement>) {
+    const tap = tapRef.current;
+    if (tap && event.pointerId === tap.pointerId) {
+      tapRef.current = null;
+      placeAt(toPage(event), tap.wasEditing);
+      return;
+    }
+    finish(event);
+  }
+
+  function onPointerCancel(event: ReactPointerEvent<HTMLCanvasElement>) {
+    if (tapRef.current?.pointerId === event.pointerId) tapRef.current = null;
+    finish(event);
   }
 
   function finish(event: ReactPointerEvent<HTMLCanvasElement>) {
@@ -305,7 +392,16 @@ export function AnnotationLayer({
     drawLive();
   }
 
-  const cursor = tool === 'hand' ? 'grab' : tool === 'eraser' ? 'cell' : 'crosshair';
+  const cursor =
+    tool === 'hand'
+      ? 'grab'
+      : tool === 'eraser'
+        ? 'cell'
+        : tool === 'text'
+          ? 'text'
+          : tool === 'note'
+            ? 'copy'
+            : 'crosshair';
 
   return (
     <div
@@ -336,13 +432,24 @@ export function AnnotationLayer({
         style={{ cursor, mixBlendMode: tool === 'highlighter' ? 'multiply' : 'normal' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
-        onPointerUp={finish}
-        onPointerCancel={finish}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
         onLostPointerCapture={finish}
         onContextMenu={(e) => e.preventDefault()}
         aria-label={`${pageIndex + 1}페이지 필기 영역`}
         role="img"
         data-ink-settings={inkSettings ? `${inkSettings.color}/${inkSettings.width}` : undefined}
+      />
+      <TextLayer
+        session={session}
+        pageIndex={pageIndex}
+        pageSize={pageSize}
+        scale={scale}
+        matrix={matrix}
+        objects={objects}
+        draft={draft}
+        onDraftDone={() => setDraft(null)}
+        interactive={interactive}
       />
     </div>
   );

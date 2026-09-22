@@ -37,6 +37,17 @@ export default defineConfig({
         globPatterns: ['**/*.{js,mjs,css,html,svg,png,woff2}'],
         // API 요청은 SPA 폴백(index.html)으로 가로채지 않는다.
         navigateFallbackDenylist: [/^\/api\//],
+        // 텍스트 폰트(약 1.5MB)는 프리캐시하지 않고 처음 쓸 때 받아 오래 보관한다.
+        runtimeCaching: [
+          {
+            urlPattern: /\/assets\/.*\.(?:otf|ttf)$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'fonts',
+              expiration: { maxEntries: 4, maxAgeSeconds: 60 * 60 * 24 * 365 },
+            },
+          },
+        ],
       },
       devOptions: { enabled: false },
     }),
