@@ -1,12 +1,28 @@
 import { ROOT_FOLDER_ID, type PdfDocument } from '@pdf-memo/shared';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { storage } from '../../storage';
+import { AnnotationToolbar } from '../annotate/AnnotationToolbar';
+import { AnnotationSession } from '../annotate/session';
+import {
+  loadToolSettings,
+  persistToolSettings,
+  useToolStore,
+  type Tool,
+} from '../annotate/toolStore';
 import { libraryService } from '../library/service';
 import { stepZoom } from './layout';
 import { PdfViewer, type PdfViewerHandle, type ZoomSetting } from './PdfViewer';
 import { usePdfDocument } from './usePdfDocument';
 import { ViewerToolbar } from './ViewerToolbar';
+
+const TOOL_KEYS: Record<string, Tool> = {
+  p: 'pen',
+  h: 'highlighter',
+  m: 'marker',
+  e: 'eraser',
+  v: 'hand',
+};
 
 export function DocumentPage() {
   const { documentId = '' } = useParams<{ documentId: string }>();
@@ -41,6 +57,12 @@ export function DocumentPage() {
     };
   }, [doc]);
 
+  // 도구 설정은 앱 전체에서 하나. 뷰어가 열릴 때 불러오고 바뀌면 저장한다
+  useEffect(() => {
+    void loadToolSettings(storage);
+    return persistToolSettings(storage);
+  }, []);
+
   if (doc === undefined) return <ViewerMessage>문서를 불러오는 중…</ViewerMessage>;
   if (doc === null) {
     return (
@@ -61,6 +83,9 @@ function DocumentViewer({ doc, blob }: { doc: PdfDocument; blob: Blob | null }) 
   const [zoom, setZoom] = useState<ZoomSetting>({ mode: 'fit-width' });
   const [effectiveScale, setEffectiveScale] = useState(1);
   const [currentPage, setCurrentPage] = useState(doc.lastViewedPage);
+  const session = useMemo(() => new AnnotationSession(storage, doc.id), [doc.id]);
+
+  useEffect(() => () => session.dispose(), [session]);
 
   // 마지막으로 본 페이지를 잠시 뒤 저장 (스크롤마다 쓰지 않음)
   useEffect(() => {
@@ -78,11 +103,28 @@ function DocumentViewer({ doc, blob }: { doc: PdfDocument; blob: Blob | null }) 
   );
   const goToPage = useCallback((index: number) => viewerRef.current?.goToPage(index), []);
 
-  // 키보드: ←/PageUp 이전, →/PageDown 다음, Home/End
+  // 키보드: Ctrl+Z/Shift+Z 취소·재실행, P/H/M/E/V 도구, ←→ PageUp/Down Home/End 페이지 이동
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
       if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
+      const mod = event.ctrlKey || event.metaKey;
+      const key = event.key.toLowerCase();
+      if (mod && key === 'z') {
+        event.preventDefault();
+        if (event.shiftKey) session.redo();
+        else session.undo();
+        return;
+      }
+      if (mod && key === 'y') {
+        event.preventDefault();
+        session.redo();
+        return;
+      }
+      if (!mod && !event.altKey && TOOL_KEYS[key]) {
+        useToolStore.getState().setTool(TOOL_KEYS[key]);
+        return;
+      }
       switch (event.key) {
         case 'ArrowLeft':
         case 'PageUp':
@@ -107,7 +149,7 @@ function DocumentViewer({ doc, blob }: { doc: PdfDocument; blob: Blob | null }) 
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [currentPage, doc.pageCount, goToPage]);
+  }, [currentPage, doc.pageCount, goToPage, session]);
 
   const backHref = doc.folderId === ROOT_FOLDER_ID ? '/' : `/f/${doc.folderId}`;
 
@@ -126,6 +168,7 @@ function DocumentViewer({ doc, blob }: { doc: PdfDocument; blob: Blob | null }) 
         onFitWidth={() => setZoom({ mode: 'fit-width' })}
         onActualSize={() => setZoom({ mode: 'fixed', scale: 1 })}
       />
+      <AnnotationToolbar session={session} />
       <div className="relative min-h-0 flex-1">
         {pdfState.status === 'ready' ? (
           <PdfViewer
@@ -134,9 +177,10 @@ function DocumentViewer({ doc, blob }: { doc: PdfDocument; blob: Blob | null }) 
             pageSizes={doc.pageSizes}
             initialPage={doc.lastViewedPage}
             zoom={zoom}
+            session={session}
+            onZoomChange={setZoom}
             onEffectiveScale={setEffectiveScale}
             onCurrentPage={setCurrentPage}
-            onZoomWheel={zoomBy}
           />
         ) : pdfState.status === 'error' ? (
           <ViewerMessage>
