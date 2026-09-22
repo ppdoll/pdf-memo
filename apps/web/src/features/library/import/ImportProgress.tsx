@@ -25,7 +25,7 @@ export function ImportProgress({ items, onDismiss, onClearFinished }: ImportProg
       aria-live="polite"
     >
       <header className="flex items-center justify-between border-b border-slate-100 px-4 py-2 text-sm">
-        <span className="font-medium">PDF 가져오기</span>
+        <span className="font-medium">가져오기</span>
         <span className="text-slate-500">
           {finished}/{items.length}
           {finished > 0 && (

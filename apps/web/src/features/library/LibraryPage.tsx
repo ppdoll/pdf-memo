@@ -10,6 +10,8 @@ import { DocumentCard } from './DocumentCard';
 import { FolderGrid } from './FolderGrid';
 import { Dropzone } from './import/Dropzone';
 import { ImportProgress } from './import/ImportProgress';
+import { isImageFile } from '../import/images/detect';
+import { ImageImportChoice } from './import/ImageImportChoice';
 import { useImportQueue } from './import/useImportQueue';
 import { RecentDocuments } from './RecentDocuments';
 import { libraryService } from './service';
@@ -25,6 +27,8 @@ export function LibraryPage() {
   const documents = useSubscribable(docsSource, EMPTY_DOCS);
   const path = useFolderPath(folderId, folders);
   const { items, importFiles, dismiss, clearFinished } = useImportQueue();
+  /** 한 번에 넣은 이미지가 2장 이상이면 묶을지 물어본다 */
+  const [pendingImages, setPendingImages] = useState<File[] | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const exporter = useExport();
@@ -84,16 +88,24 @@ export function LibraryPage() {
     void exporter.run(doc.id, 'flattened', 'download');
   }
 
+  function handleFiles(files: File[]) {
+    const images = files.filter(isImageFile);
+    const others = files.filter((f) => !isImageFile(f));
+    if (others.length > 0) importFiles(others, folderId);
+    if (images.length >= 2) setPendingImages(images);
+    else if (images.length === 1) importFiles(images, folderId);
+  }
+
   function onPickFiles(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
     event.target.value = '';
-    importFiles(files, folderId);
+    handleFiles(files);
   }
 
   const empty = folders.length === 0 && documents.length === 0;
 
   return (
-    <Dropzone onFiles={(files) => importFiles(files, folderId)}>
+    <Dropzone onFiles={handleFiles}>
       <div className="space-y-6">
         <header>
           <nav
@@ -133,7 +145,7 @@ export function LibraryPage() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                title="PDF, 마크다운(.md), 텍스트(.txt) 파일을 가져옵니다"
+                title="PDF, 마크다운(.md), 텍스트(.txt), 이미지(JPEG·PNG 등) 파일을 가져옵니다"
                 className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
               >
                 가져오기
@@ -141,7 +153,7 @@ export function LibraryPage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="application/pdf,.pdf,.md,.markdown,.txt,text/markdown,text/plain"
+                accept="application/pdf,.pdf,.md,.markdown,.txt,text/markdown,text/plain,image/*"
                 multiple
                 hidden
                 onChange={onPickFiles}
@@ -194,7 +206,7 @@ export function LibraryPage() {
         {empty && (
           <div className="rounded-2xl border-2 border-dashed border-slate-300 px-6 py-16 text-center">
             <p className="text-sm text-slate-600">
-              PDF나 마크다운(.md) 파일을 여기에 끌어다 놓거나 "가져오기"를 누르세요.
+              PDF·마크다운(.md)·이미지 파일을 여기에 끌어다 놓거나 "가져오기"를 누르세요.
             </p>
             <p className="mt-1 text-xs text-slate-400">
               파일은 이 브라우저 안에만 저장되고 서버로 올라가지 않습니다.
@@ -203,6 +215,17 @@ export function LibraryPage() {
         )}
       </div>
 
+      {pendingImages && (
+        <ImageImportChoice
+          count={pendingImages.length}
+          onChoose={(merge) => {
+            const files = pendingImages;
+            setPendingImages(null);
+            importFiles(files, folderId, { mergeImages: merge });
+          }}
+          onCancel={() => setPendingImages(null)}
+        />
+      )}
       <ImportProgress items={items} onDismiss={dismiss} onClearFinished={clearFinished} />
     </Dropzone>
   );

@@ -1,6 +1,7 @@
 import { newId } from '@pdf-memo/shared';
 import { useCallback, useRef, useState } from 'react';
 import { storage } from '../../../storage';
+import { HEIC_MESSAGE, imagesTitle, isHeicFile, isImageFile } from '../../import/images/detect';
 import { isMarkdownFile } from '../../import/markdown/detect';
 import { analyzePdf } from '../../viewer/pdf/analyze';
 import { importPdfFile, type ImportOutcome, type ImportStage } from './importPdf';
@@ -14,8 +15,53 @@ export interface ImportItem {
 
 interface ImportJob {
   item: ImportItem;
-  file: File;
+  /** 보통 파일 하나. 이미지를 한 문서로 묶을 때만 여러 개 */
+  files: File[];
   folderId: string;
+}
+
+export interface ImportFilesOptions {
+  /** 이미지 여러 장을 한 문서(여러 페이지)로 묶는다. 이미지가 아닌 파일은 각각 처리 */
+  mergeImages?: boolean;
+}
+
+interface PdfSource {
+  file: File;
+  title?: string;
+  originalFileName?: string;
+}
+
+/**
+ * 파일 종류에 따라 PDF로 바꾼다. 변환기(pdf-lib·marked·fontkit)는 필요할 때만 내려받는다.
+ * PDF는 그대로 돌려준다.
+ */
+async function toPdfSource(
+  files: File[],
+  onStage: (stage: ImportStage) => void,
+): Promise<PdfSource> {
+  const [first] = files;
+  if (files.length > 1 || isImageFile(first)) {
+    if (files.some(isHeicFile)) throw new Error(HEIC_MESSAGE);
+    onStage('converting');
+    const { imageFilesToPdf } = await import('../../import/images/imagesToPdf');
+    const converted = await imageFilesToPdf(files);
+    return {
+      file: converted.file,
+      title: converted.title,
+      originalFileName: converted.originalFileName,
+    };
+  }
+  if (isMarkdownFile(first)) {
+    onStage('converting');
+    const { markdownFileToPdf } = await import('../../import/markdown/markdownToPdf');
+    const converted = await markdownFileToPdf(first);
+    return {
+      file: converted.file,
+      title: converted.title,
+      originalFileName: converted.originalFileName,
+    };
+  }
+  return { file: first };
 }
 
 /**
@@ -37,29 +83,21 @@ export function useImportQueue() {
     try {
       while (queueRef.current.length > 0) {
         const job = queueRef.current.shift() as ImportJob;
-        let file = job.file;
-        let source: { title?: string; originalFileName?: string } = {};
-        if (isMarkdownFile(file)) {
-          // 마크다운·텍스트는 먼저 A4 PDF로 바꾼 뒤 같은 파이프라인에 넣는다
-          patch(job.item.id, { stage: 'converting' });
-          try {
-            // 변환기(marked·pdf-lib·fontkit)는 마크다운을 넣을 때만 내려받는다
-            const { markdownFileToPdf } = await import('../../import/markdown/markdownToPdf');
-            const converted = await markdownFileToPdf(file);
-            file = converted.file;
-            source = { title: converted.title, originalFileName: converted.originalFileName };
-          } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            patch(job.item.id, { outcome: { status: 'error', message: `변환 실패: ${message}` } });
-            continue;
-          }
+        let source: PdfSource;
+        try {
+          source = await toPdfSource(job.files, (stage) => patch(job.item.id, { stage }));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          patch(job.item.id, { outcome: { status: 'error', message: `변환 실패: ${message}` } });
+          continue;
         }
-        const outcome = await importPdfFile(file, {
+        const outcome = await importPdfFile(source.file, {
           storage,
           analyze: analyzePdf,
           folderId: job.folderId,
           onStage: (stage) => patch(job.item.id, { stage }),
-          ...source,
+          title: source.title,
+          originalFileName: source.originalFileName,
         });
         patch(job.item.id, { outcome });
       }
@@ -69,13 +107,28 @@ export function useImportQueue() {
   }, [patch]);
 
   const importFiles = useCallback(
-    (files: File[], folderId: string) => {
+    (files: File[], folderId: string, options: ImportFilesOptions = {}) => {
       if (files.length === 0) return;
-      const jobs: ImportJob[] = files.map((file) => ({
+      const single = (file: File): ImportJob => ({
         item: { id: newId(), fileName: file.name, stage: 'queued' },
-        file,
+        files: [file],
         folderId,
-      }));
+      });
+      const jobs: ImportJob[] = [];
+      if (options.mergeImages) {
+        const images = files.filter(isImageFile);
+        const others = files.filter((file) => !isImageFile(file));
+        if (images.length > 0) {
+          jobs.push({
+            item: { id: newId(), fileName: imagesTitle(images), stage: 'queued' },
+            files: images,
+            folderId,
+          });
+        }
+        jobs.push(...others.map(single));
+      } else {
+        jobs.push(...files.map(single));
+      }
       setItems((prev) => [...prev, ...jobs.map((j) => j.item)]);
       queueRef.current.push(...jobs);
       void pump();
