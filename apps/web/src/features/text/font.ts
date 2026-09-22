@@ -1,4 +1,5 @@
 import fontUrl from 'pretendard/dist/public/static/Pretendard-Regular.otf?url';
+import boldFontUrl from 'pretendard/dist/public/static/Pretendard-Bold.otf?url';
 import { TEXT_FONT_FAMILY } from './model';
 import type { Measure } from './wrap';
 
@@ -7,6 +8,7 @@ import type { Measure } from './wrap';
  * 필요할 때만 불러오며(약 1.5MB), 서비스워커가 런타임 캐시로 보관한다.
  */
 export const TEXT_FONT_URL: string = fontUrl;
+export const TEXT_FONT_BOLD_URL: string = boldFontUrl;
 
 let facePromise: Promise<boolean> | undefined;
 
@@ -40,19 +42,32 @@ export function createTextMeasurer(fontSize: number): Measure {
   return (s) => ctx.measureText(s).width;
 }
 
+function fetchFontBytes(url: string, label: string): Promise<Uint8Array> {
+  return fetch(url)
+    .then((response) => {
+      if (!response.ok) throw new Error(`${label}을 불러올 수 없습니다`);
+      return response.arrayBuffer();
+    })
+    .then((buffer) => new Uint8Array(buffer));
+}
+
 let bytesPromise: Promise<Uint8Array> | undefined;
+let boldBytesPromise: Promise<Uint8Array> | undefined;
 
 /** PDF 임베드용 원본 바이트 */
 export function loadTextFontBytes(): Promise<Uint8Array> {
-  bytesPromise ??= fetch(fontUrl)
-    .then((response) => {
-      if (!response.ok) throw new Error('텍스트 폰트를 불러올 수 없습니다');
-      return response.arrayBuffer();
-    })
-    .then((buffer) => new Uint8Array(buffer))
-    .catch((error: unknown) => {
-      bytesPromise = undefined;
-      throw error;
-    });
+  bytesPromise ??= fetchFontBytes(fontUrl, '텍스트 폰트').catch((error: unknown) => {
+    bytesPromise = undefined;
+    throw error;
+  });
   return bytesPromise;
+}
+
+/** 굵은 글꼴 바이트 (마크다운 → PDF의 제목·강조용). 필요할 때만 받는다 */
+export function loadTextFontBoldBytes(): Promise<Uint8Array> {
+  boldBytesPromise ??= fetchFontBytes(boldFontUrl, '굵은 글꼴').catch((error: unknown) => {
+    boldBytesPromise = undefined;
+    throw error;
+  });
+  return boldBytesPromise;
 }

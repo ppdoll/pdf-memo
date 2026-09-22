@@ -818,6 +818,7 @@ Hobby 개인 계정에서 대시보드 설정 없이 push만으로 동작하도�
 **Phase 1.5 — 꾸미기·편의 (2~3주)**
 
 - [x] 스티커(2026-09-22): 내장 벡터 팩 32종(기본·표정·꾸미기·말풍선·테이프, `features/sticker/pack.ts`) + 사용자 이미지(PNG/JPEG로 재인코딩, 긴 변 1024px, sha-256 자산 id), 고른 뒤 탭으로 붙이기, 이동·비율 고정 크기 조절·회전(90도 근처 스냅)·불투명도, 지우개·Delete·Undo, 최근 사용. 내보내기: 팩은 같은 path를 drawSvgPath로(벡터), 이미지는 PNG/JPEG XObject로, 둘 다 중심 축 회전
+- [x] 마크다운·텍스트 가져오기(2026-09-22): .md/.markdown/.txt를 브라우저에서 A4 PDF로 조판해(`features/import/markdown/`: marked 파서 → 블록 모델 → 순수 조판기 → pdf-lib 렌더, Pretendard Regular/Bold 서브셋 임베드) 기존 PDF 파이프라인에 넣는다. 제목(H1이 문서 제목)·문단·굵게/기울임(기울임은 텍스트 행렬 skew)·목록(체크박스 포함, 중첩)·인용·코드 블록(페이지 넘김 분할)·표(머리글 반복, 정렬)·구분선·링크(URI 주석)·이미지(data:/CORS 허용 http만, 실패 시 자리표시)·페이지 번호. 변환기는 동적 import로 분리. PowerPoint 등은 "PDF로 저장" 안내로 대체(브라우저 변환 품질 부족)
 - [ ] 도형, 마스킹 테이프 가로 반복(repeat), 스티커 뒤집기(flipX/flipY)
 - [ ] 텍스트 형광펜(텍스트 레이어), 올가미 선택·변형
 - [ ] 페이지 썸네일 사이드바, PDF outline

@@ -1,6 +1,7 @@
 import { newId } from '@pdf-memo/shared';
 import { useCallback, useRef, useState } from 'react';
 import { storage } from '../../../storage';
+import { isMarkdownFile } from '../../import/markdown/detect';
 import { analyzePdf } from '../../viewer/pdf/analyze';
 import { importPdfFile, type ImportOutcome, type ImportStage } from './importPdf';
 
@@ -36,11 +37,29 @@ export function useImportQueue() {
     try {
       while (queueRef.current.length > 0) {
         const job = queueRef.current.shift() as ImportJob;
-        const outcome = await importPdfFile(job.file, {
+        let file = job.file;
+        let source: { title?: string; originalFileName?: string } = {};
+        if (isMarkdownFile(file)) {
+          // 마크다운·텍스트는 먼저 A4 PDF로 바꾼 뒤 같은 파이프라인에 넣는다
+          patch(job.item.id, { stage: 'converting' });
+          try {
+            // 변환기(marked·pdf-lib·fontkit)는 마크다운을 넣을 때만 내려받는다
+            const { markdownFileToPdf } = await import('../../import/markdown/markdownToPdf');
+            const converted = await markdownFileToPdf(file);
+            file = converted.file;
+            source = { title: converted.title, originalFileName: converted.originalFileName };
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            patch(job.item.id, { outcome: { status: 'error', message: `변환 실패: ${message}` } });
+            continue;
+          }
+        }
+        const outcome = await importPdfFile(file, {
           storage,
           analyze: analyzePdf,
           folderId: job.folderId,
           onStage: (stage) => patch(job.item.id, { stage }),
+          ...source,
         });
         patch(job.item.id, { outcome });
       }

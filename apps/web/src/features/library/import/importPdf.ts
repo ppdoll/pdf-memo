@@ -19,7 +19,7 @@ export interface PdfAnalysis {
 /** pdf.js로 페이지 수·크기·썸네일을 얻는다. 테스트에서는 가짜를 주입한다 */
 export type PdfAnalyzer = (blob: Blob) => Promise<PdfAnalysis>;
 
-export type ImportStage = 'hashing' | 'analyzing' | 'saving';
+export type ImportStage = 'converting' | 'hashing' | 'analyzing' | 'saving';
 
 export type ImportOutcome =
   | { status: 'done'; documentId: string }
@@ -33,6 +33,9 @@ export interface ImportOptions {
   onStage?: (stage: ImportStage) => void;
   /** 테스트용 상한 재정의 */
   maxBytes?: number;
+  /** 변환해서 들어온 파일(마크다운 등)의 제목과 원래 파일 이름 */
+  title?: string;
+  originalFileName?: string;
 }
 
 export function isPdfFile(file: File): boolean {
@@ -53,7 +56,15 @@ export function titleFromFileName(name: string): string {
  * pdf.js 분석은 IndexedDB 트랜잭션 밖에서 끝내야 한다(Dexie는 외부 await를 허용하지 않음).
  */
 export async function importPdfFile(file: File, options: ImportOptions): Promise<ImportOutcome> {
-  const { storage, analyze, folderId, onStage, maxBytes = MAX_PDF_BYTES } = options;
+  const {
+    storage,
+    analyze,
+    folderId,
+    onStage,
+    maxBytes = MAX_PDF_BYTES,
+    title,
+    originalFileName,
+  } = options;
 
   if (!isPdfFile(file)) return { status: 'error', message: 'PDF 파일이 아닙니다' };
   if (file.size === 0) return { status: 'error', message: '빈 파일입니다' };
@@ -103,8 +114,8 @@ export async function importPdfFile(file: File, options: ImportOptions): Promise
     : null;
 
   const draft = createPdfDocument({
-    title: titleFromFileName(file.name),
-    originalFileName: file.name.slice(0, 300),
+    title: title?.trim() ? title.trim().slice(0, 300) : titleFromFileName(file.name),
+    originalFileName: (originalFileName ?? file.name).slice(0, 300),
     blobHash: hash,
     byteSize: file.size,
     pageCount: analysis.pageCount,
