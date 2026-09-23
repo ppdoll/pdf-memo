@@ -35,6 +35,9 @@ import { useSelectionStore } from '../text/selectionStore';
 import { TextLayer } from '../text/TextLayer';
 import { createImageObject } from '../sticker/model';
 import { StickerLayer } from '../sticker/StickerLayer';
+import { drawShapeOnCanvas } from '../shape/draw';
+import { SHAPE_DASH, createShapeObject, geometryFromDrag, shapeHit } from '../shape/model';
+import { ShapeLayer } from '../shape/ShapeLayer';
 import { bboxContainsPoint } from '@pdf-memo/shared';
 import type { TextObject } from '@pdf-memo/shared';
 
@@ -56,6 +59,9 @@ interface StrokeState {
   last: Point | null;
   erased: Map<string, AnnotationObject>;
   cursor: Point | null;
+  /** 도형 도구: 끌기 시작점·현재점 (페이지 공간) */
+  shapeStart: Point | null;
+  shapeEnd: Point | null;
 }
 
 const EMPTY_HIDDEN: ReadonlySet<string> = new Set();
@@ -154,6 +160,24 @@ export function AnnotationLayer({
       ctx.stroke();
       return;
     }
+    if (stroke.tool === 'shape') {
+      if (!stroke.shapeStart || !stroke.shapeEnd) return;
+      const defaults = useToolStore.getState().shape;
+      drawShapeOnCanvas(
+        ctx,
+        {
+          kind: defaults.kind,
+          stroke: defaults.stroke,
+          strokeWidth: defaults.strokeWidth,
+          fill: defaults.fill,
+          dash: defaults.dashed ? SHAPE_DASH : null,
+        },
+        geometryFromDrag(defaults.kind, stroke.shapeStart, stroke.shapeEnd),
+        matrix,
+        dpr,
+      );
+      return;
+    }
     if (!stroke.ink) return;
     const settings = useToolStore.getState()[stroke.ink];
     const profile = TOOL_PROFILES[stroke.ink];
@@ -192,8 +216,11 @@ export function AnnotationLayer({
 
   function shouldStart(event: ReactPointerEvent<HTMLCanvasElement>): boolean {
     if (!interactive || tool === 'hand') return false;
-    if (event.pointerType === 'touch')
+    if (event.pointerType === 'touch') {
+      // 도형은 손가락으로도 그린다 (도구를 고른 의도가 분명하므로)
+      if (tool === 'shape') return event.isPrimary;
       return fingerDraws && event.isPrimary && !penTracker.isPalmWindow();
+    }
     if (event.pointerType === 'mouse') return event.button === 0;
     return true;
   }
@@ -219,8 +246,10 @@ export function AnnotationLayer({
       const hit =
         object.type === 'ink'
           ? inkHit(object.points, object.width, p, eraserRadius)
-          : (object.type === 'text' || object.type === 'note' || object.type === 'image') &&
-            bboxContainsPoint(bboxExpand(object.bbox, eraserRadius), p);
+          : object.type === 'shape'
+            ? shapeHit(object, p, eraserRadius)
+            : (object.type === 'text' || object.type === 'note' || object.type === 'image') &&
+              bboxContainsPoint(bboxExpand(object.bbox, eraserRadius), p);
       if (hit) {
         stroke.erased.set(object.id, object);
         changed = true;
@@ -309,11 +338,16 @@ export function AnnotationLayer({
       last: null,
       erased: new Map(),
       cursor: null,
+      shapeStart: null,
+      shapeEnd: null,
     };
     strokeRef.current = stroke;
     const p = toPage(event);
     if (active === 'eraser') eraseAt(stroke, p);
-    else appendPoint(stroke, p, pressureOf(event));
+    else if (active === 'shape') {
+      stroke.shapeStart = p;
+      stroke.shapeEnd = p;
+    } else appendPoint(stroke, p, pressureOf(event));
     scheduleDraw();
   }
 
@@ -341,6 +375,7 @@ export function AnnotationLayer({
     for (const sample of samples) {
       const p = toPage(sample);
       if (stroke.tool === 'eraser') eraseAt(stroke, p);
+      else if (stroke.tool === 'shape') stroke.shapeEnd = p;
       else appendPoint(stroke, p, pressureOf(sample));
     }
     scheduleDraw();
@@ -378,6 +413,17 @@ export function AnnotationLayer({
           removed.map((object) => ({ kind: 'remove' as const, object })),
         );
       }
+    } else if (stroke.tool === 'shape' && stroke.shapeStart && stroke.shapeEnd) {
+      const defaults = useToolStore.getState().shape;
+      const object = createShapeObject(
+        session.documentId,
+        pageIndex,
+        session.nextZ(pageIndex),
+        geometryFromDrag(defaults.kind, stroke.shapeStart, stroke.shapeEnd),
+        defaults,
+      );
+      session.commit('도형', [{ kind: 'add', object }]);
+      useSelectionStore.getState().select({ pageIndex, id: object.id });
     } else if (stroke.ink && stroke.points.length >= 3) {
       const settings = useToolStore.getState()[stroke.ink];
       const profile = TOOL_PROFILES[stroke.ink];
@@ -454,6 +500,15 @@ export function AnnotationLayer({
         aria-label={`${pageIndex + 1}페이지 필기 영역`}
         role="img"
         data-ink-settings={inkSettings ? `${inkSettings.color}/${inkSettings.width}` : undefined}
+      />
+      <ShapeLayer
+        session={session}
+        pageIndex={pageIndex}
+        pageSize={pageSize}
+        scale={scale}
+        matrix={matrix}
+        objects={objects}
+        interactive={interactive}
       />
       <StickerLayer
         session={session}

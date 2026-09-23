@@ -11,6 +11,7 @@ import { dirname, join } from 'node:path';
 import { PDFDict, PDFDocument, PDFName, degrees, type PDFPage } from 'pdf-lib';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { describe, expect, it } from 'vitest';
+import { createShapeObject, lineFromEndpoints } from '../../shape/model';
 import { createImageObject, withImageGeometry } from '../../sticker/model';
 import { EncryptedPdfError, flattenAnnotations, groupByPage } from '../flatten';
 
@@ -208,6 +209,44 @@ describe('flattenAnnotations', () => {
     expect(
       output.getPage(1).node.Resources()?.lookupMaybe(PDFName.of('XObject'), PDFDict),
     ).toBeUndefined();
+  });
+
+  it('draws shapes as vector paths with fills, dashes and arrow heads', async () => {
+    const original = await makePdf();
+    const style = {
+      kind: 'rect' as const,
+      stroke: '#ef4444',
+      strokeWidth: 2,
+      fill: '#fef08a',
+      dashed: true,
+    };
+    const shapes = [
+      createShapeObject(DOC_ID, 0, 1, { x: 40, y: 40, w: 120, h: 60, rotation: 20 }, style),
+      createShapeObject(
+        DOC_ID,
+        0,
+        2,
+        { x: 200, y: 40, w: 80, h: 80, rotation: 0 },
+        { ...style, kind: 'ellipse', dashed: false },
+      ),
+      createShapeObject(DOC_ID, 0, 3, lineFromEndpoints({ x: 40, y: 200 }, { x: 240, y: 260 }), {
+        ...style,
+        kind: 'line',
+        fill: null,
+      }),
+      createShapeObject(DOC_ID, 1, 4, lineFromEndpoints({ x: 60, y: 60 }, { x: 60, y: 200 }), {
+        ...style,
+        kind: 'arrow',
+        fill: null,
+        dashed: false,
+      }),
+    ];
+    const result = await flattenAnnotations(original, shapes);
+    expect(result.drawn).toBe(4);
+    expect(result.skipped).toBe(0);
+    const output = await PDFDocument.load(result.bytes);
+    expect(output.getPageCount()).toBe(2);
+    expect(result.bytes.byteLength).toBeGreaterThan(original.byteLength);
   });
 
   it('rejects encrypted PDFs with a readable error', async () => {

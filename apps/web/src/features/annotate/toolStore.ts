@@ -2,9 +2,10 @@ import type { InkTool } from '@pdf-memo/shared';
 import { create } from 'zustand';
 import type { Storage } from '../../storage/ports';
 import { RECENT_STICKERS_MAX, type StickerRef } from '../sticker/model';
+import type { ShapeDefaults } from '../shape/model';
 import type { TextAlign, TextDefaults } from '../text/model';
 
-export type Tool = InkTool | 'eraser' | 'hand' | 'text' | 'note' | 'sticker';
+export type Tool = InkTool | 'eraser' | 'hand' | 'text' | 'note' | 'sticker' | 'shape';
 
 export interface InkSettings {
   color: string;
@@ -35,6 +36,7 @@ export interface ToolSnapshot {
   /** 새 스티키 노트의 색 */
   note: NoteDefaults;
   sticker: StickerSettings;
+  shape: ShapeDefaults;
 }
 
 interface ToolState extends ToolSnapshot {
@@ -46,6 +48,7 @@ interface ToolState extends ToolSnapshot {
   setNote(patch: Partial<NoteDefaults>): void;
   /** 붙일 스티커를 고른다. 고르면 최근 목록 맨 앞에 넣는다 */
   setSticker(ref: StickerRef | null): void;
+  setShape(patch: Partial<ShapeDefaults>): void;
   hydrate(snapshot: Partial<ToolSnapshot>): void;
 }
 
@@ -59,6 +62,7 @@ export const DEFAULT_TOOLS: ToolSnapshot = {
   text: { color: '#1f2937', fontSize: 14, background: null, align: 'left' },
   note: { color: '#fde047' },
   sticker: { active: null, recent: [] },
+  shape: { kind: 'rect', stroke: '#ef4444', strokeWidth: 2, fill: null, dashed: false },
 };
 
 export const INK_COLORS: Record<InkTool, string[]> = {
@@ -76,7 +80,18 @@ export const INK_WIDTHS: Record<InkTool, number[]> = {
 
 export const ERASER_RADII = [4, 8, 16];
 
-const TOOLS: Tool[] = ['pen', 'highlighter', 'marker', 'eraser', 'hand', 'text', 'note', 'sticker'];
+const TOOLS: Tool[] = [
+  'pen',
+  'highlighter',
+  'marker',
+  'eraser',
+  'hand',
+  'text',
+  'note',
+  'sticker',
+  'shape',
+];
+const SHAPE_KIND_VALUES: ShapeDefaults['kind'][] = ['rect', 'ellipse', 'line', 'arrow'];
 const ALIGNS: TextAlign[] = ['left', 'center', 'right'];
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -136,6 +151,21 @@ function sanitizeSticker(value: unknown, fallback: StickerSettings): StickerSett
   return { active: sanitizeStickerRef(v.active), recent };
 }
 
+function sanitizeShape(value: unknown, fallback: ShapeDefaults): ShapeDefaults {
+  if (typeof value !== 'object' || value === null) return fallback;
+  const v = value as Partial<ShapeDefaults>;
+  return {
+    kind: v.kind && SHAPE_KIND_VALUES.includes(v.kind) ? v.kind : fallback.kind,
+    stroke: isHex(v.stroke) ? v.stroke : fallback.stroke,
+    strokeWidth:
+      typeof v.strokeWidth === 'number' && v.strokeWidth > 0 && v.strokeWidth <= 64
+        ? v.strokeWidth
+        : fallback.strokeWidth,
+    fill: v.fill === null || isHex(v.fill) ? v.fill : fallback.fill,
+    dashed: typeof v.dashed === 'boolean' ? v.dashed : fallback.dashed,
+  };
+}
+
 /** 저장된 설정을 검증해 상태로 바꾼다 (손상된 값은 기본값으로) */
 export function sanitizeSnapshot(input: Partial<ToolSnapshot>): ToolSnapshot {
   return {
@@ -152,6 +182,7 @@ export function sanitizeSnapshot(input: Partial<ToolSnapshot>): ToolSnapshot {
     text: sanitizeText(input.text, DEFAULT_TOOLS.text),
     note: sanitizeNote(input.note, DEFAULT_TOOLS.note),
     sticker: sanitizeSticker(input.sticker, DEFAULT_TOOLS.sticker),
+    shape: sanitizeShape(input.shape, DEFAULT_TOOLS.shape),
   };
 }
 
@@ -178,6 +209,7 @@ export const useToolStore = create<ToolState>()((set) => ({
       );
       return { sticker: { active: ref, recent } };
     }),
+  setShape: (patch) => set((state) => ({ shape: { ...state.shape, ...patch } })),
   hydrate: (snapshot) => set(sanitizeSnapshot(snapshot)),
 }));
 
@@ -192,6 +224,7 @@ export function toolSnapshot(state: ToolSnapshot): ToolSnapshot {
     text: state.text,
     note: state.note,
     sticker: state.sticker,
+    shape: state.shape,
   };
 }
 

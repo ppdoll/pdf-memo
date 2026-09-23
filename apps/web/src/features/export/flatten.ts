@@ -3,11 +3,14 @@ import type {
   ImageObject,
   InkObject,
   NoteObject,
+  ShapeObject,
   TextObject,
 } from '@pdf-memo/shared';
 import type { PDFDocument, PDFFont, PDFImage, PDFPage, RGB } from 'pdf-lib';
 import { inkOutline } from '../annotate/ink';
+import { arrowHeadLocal, arrowHeadSize, isLinear } from '../shape/model';
 import { pdfAnchors } from '../sticker/model';
+import { ellipsePath } from '../sticker/paths';
 import { getPackSticker, isPackAssetId } from '../sticker/pack';
 import { NOTE_EXPANDED_WIDTH, NOTE_SIZE, TEXT_LINE_HEIGHT, TEXT_PADDING } from '../text/model';
 import { wrapText } from '../text/wrap';
@@ -125,6 +128,10 @@ export async function flattenAnnotations(
           break;
         case 'image':
           ok = await drawImageObject(page, object, origin, deps);
+          break;
+        case 'shape':
+          drawShapeObject(page, object, origin, deps);
+          ok = true;
           break;
         default:
       }
@@ -356,4 +363,53 @@ async function drawImageObject(
     opacity: image.opacity,
   });
   return true;
+}
+
+/**
+ * 도형. 사각형·타원은 중심 회전이 되도록 pdfAnchors로 좌상단 기준점을 잡고, 선·화살표는 시작점을 축으로 방향만큼 회전한다.
+ * 화면(SVG)과 같은 로컬 좌표(y 아래)를 drawSvgPath가 뒤집어 그린다.
+ */
+function drawShapeObject(page: PDFPage, shape: ShapeObject, origin: Origin, deps: DrawDeps) {
+  const { degrees, LineCapStyle } = deps.lib;
+  const stroke = toRgb(shape.stroke, deps);
+  const dash = shape.dash && shape.dash.length > 0 ? [...shape.dash] : undefined;
+  if (isLinear(shape.shape)) {
+    const head = shape.shape === 'arrow' ? arrowHeadSize(shape.strokeWidth) : 0;
+    const bodyEnd = Math.max(0, shape.w - head * 0.6);
+    const common = {
+      x: origin.x + shape.x,
+      y: origin.y - shape.y,
+      rotate: degrees(shape.rotation === 0 ? 0 : -shape.rotation),
+    };
+    page.drawSvgPath(`M 0 0 L ${bodyEnd} 0`, {
+      ...common,
+      borderColor: stroke,
+      borderWidth: shape.strokeWidth,
+      borderLineCap: LineCapStyle.Round,
+      borderDashArray: dash,
+    });
+    if (shape.shape === 'arrow') {
+      const [tip, left, right] = arrowHeadLocal(shape.w, shape.strokeWidth);
+      page.drawSvgPath(`M ${tip.x} ${tip.y} L ${left.x} ${left.y} L ${right.x} ${right.y} Z`, {
+        ...common,
+        color: stroke,
+        borderWidth: 0,
+      });
+    }
+    return;
+  }
+  const anchors = pdfAnchors(shape, origin);
+  const path =
+    shape.shape === 'rect'
+      ? `M 0 0 L ${shape.w} 0 L ${shape.w} ${shape.h} L 0 ${shape.h} Z`
+      : ellipsePath(shape.w / 2, shape.h / 2, shape.w / 2, shape.h / 2);
+  page.drawSvgPath(path, {
+    x: anchors.svg.x,
+    y: anchors.svg.y,
+    rotate: degrees(anchors.rotateDeg),
+    color: shape.fill ? toRgb(shape.fill, deps) : undefined,
+    borderColor: stroke,
+    borderWidth: shape.strokeWidth,
+    borderDashArray: dash,
+  });
 }

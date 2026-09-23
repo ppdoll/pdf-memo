@@ -1,4 +1,5 @@
 import type { InkTool } from '@pdf-memo/shared';
+import { ShapeControls } from '../shape/ShapeControls';
 import { StickerControls, StickerPicker } from '../sticker/StickerPicker';
 import { TextControls } from '../text/TextControls';
 import { useSessionStatus } from './hooks';
@@ -20,6 +21,7 @@ const TOOL_BUTTONS: Array<{ tool: Tool; label: string; key: string }> = [
   { tool: 'text', label: '텍스트', key: 'T' },
   { tool: 'note', label: '노트', key: 'N' },
   { tool: 'sticker', label: '스티커', key: 'S' },
+  { tool: 'shape', label: '도형', key: 'D' },
   { tool: 'hand', label: '손', key: 'V' },
 ];
 
@@ -133,6 +135,7 @@ export function AnnotationToolbar({ session }: AnnotationToolbarProps) {
 
         <TextControls session={session} />
         <StickerControls session={session} />
+        <ShapeControls session={session} />
 
         {tool === 'eraser' && (
           <div className="flex items-center gap-1" aria-label="지우개 크기">
