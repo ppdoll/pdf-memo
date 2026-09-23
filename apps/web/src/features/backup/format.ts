@@ -1,4 +1,5 @@
 import { BACKUP_FILE_EXTENSION } from '@pdf-memo/shared';
+import { APP_NAME } from '../../app/brand';
 
 /**
  * 백업 zip 구조 (docs/DESIGN.md §7.4)
@@ -70,11 +71,11 @@ export function parseEntryName(name: string): ParsedEntry {
   return { kind: 'unknown' };
 }
 
-/** `PDF MEMO 백업 2026-09-22 1530.pdfmemo.zip` */
+/** `ALL READ MEMO 백업 2026-09-22 1530.pdfmemo.zip` (확장자는 예전 그대로 두어 옛 백업도 읽힌다) */
 export function backupFileName(date: Date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   const stamp = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}${pad(date.getMinutes())}`;
-  return `PDF MEMO 백업 ${stamp}${BACKUP_FILE_EXTENSION}`;
+  return `${APP_NAME} 백업 ${stamp}${BACKUP_FILE_EXTENSION}`;
 }
 
 /** settings 키 */

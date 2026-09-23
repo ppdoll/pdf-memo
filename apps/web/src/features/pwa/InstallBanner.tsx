@@ -1,5 +1,6 @@
 import { nowIso } from '@pdf-memo/shared';
 import { useEffect, useState } from 'react';
+import { APP_NAME } from '../../app/brand';
 import { storage } from '../../storage';
 import { promptInstall, useInstallStore } from './installPrompt';
 import {
@@ -70,7 +71,7 @@ export function InstallBanner() {
     >
       <img src="/icons/icon-192.png" alt="" className="h-10 w-10 rounded-xl shadow-sm" />
       <div className="min-w-0 flex-1">
-        <p className="font-medium text-slate-900">홈 화면에 PDF MEMO 추가</p>
+        <p className="font-medium text-slate-900">홈 화면에 {APP_NAME} 추가</p>
         <p className="text-slate-600">
           {platform === 'ios'
             ? 'Safari 아래 공유 버튼을 누르고 "홈 화면에 추가"를 고르면 앱처럼 열 수 있어요.'

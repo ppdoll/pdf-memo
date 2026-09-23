@@ -1,6 +1,7 @@
 import { ROOT_FOLDER_ID, documentKind, type PdfDocument } from '@pdf-memo/shared';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
+import { APP_NAME } from '../../app/brand';
 import { storage } from '../../storage';
 import { AnnotationToolbar } from '../annotate/AnnotationToolbar';
 import { AnnotationSession } from '../annotate/session';
@@ -57,9 +58,9 @@ export function DocumentPage() {
   }, [documentId]);
 
   useEffect(() => {
-    if (doc) document.title = `${doc.title} · PDF MEMO`;
+    if (doc) document.title = `${doc.title} · ${APP_NAME}`;
     return () => {
-      document.title = 'PDF MEMO';
+      document.title = APP_NAME;
     };
   }, [doc]);
 

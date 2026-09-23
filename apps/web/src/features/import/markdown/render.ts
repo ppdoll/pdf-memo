@@ -1,4 +1,5 @@
 import type { PDFFont, PDFImage, PDFPage } from 'pdf-lib';
+import { APP_NAME } from '../../../app/brand';
 import { hexToRgb01 } from '../../export/svgPath';
 import {
   MARGINS,
@@ -186,8 +187,8 @@ export async function renderMarkdownPdf(input: RenderInput): Promise<RenderOutpu
   }
 
   if (input.title) pdf.setTitle(input.title);
-  pdf.setProducer('PDF MEMO');
-  pdf.setCreator('PDF MEMO (Markdown)');
+  pdf.setProducer(APP_NAME);
+  pdf.setCreator(`${APP_NAME} (Markdown)`);
   const bytes = await pdf.save({ useObjectStreams: true });
   return { bytes, pageCount: total };
 }

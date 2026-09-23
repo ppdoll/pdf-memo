@@ -121,7 +121,7 @@ describe('format helpers', () => {
     });
     expect(parseEntryName('__MACOSX/x')).toEqual({ kind: 'unknown' });
     expect(backupFileName(new Date(2026, 8, 22, 15, 30))).toBe(
-      'PDF MEMO 백업 2026-09-22 1530.pdfmemo.zip',
+      'ALL READ MEMO 백업 2026-09-22 1530.pdfmemo.zip',
     );
   });
 

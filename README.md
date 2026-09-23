@@ -1,4 +1,6 @@
-# PDF MEMO
+# ALL READ MEMO
+
+> 제품 이름은 2026-09-23에 PDF MEMO에서 ALL READ MEMO로 바꿨습니다. 저장소·패키지 이름(`pdf-memo`, `@pdf-memo/*`), IndexedDB 이름, 백업 확장자(`.pdfmemo.zip`)는 기존 데이터 호환을 위해 그대로 둡니다. 표시 이름은 `apps/web/src/app/brand.ts` 한 곳에서 바꿉니다.
 
 로컬 PDF를 불러와 그 위에 메모·필기·꾸미기를 하고 폴더로 정리하는 웹 앱.
 로그인 없이 브라우저 안에 저장하고(1단계), 나중에 클라우드 백업·동기화를 붙일 수 있게 설계했다(2단계).
@@ -44,7 +46,7 @@ pnpm ci               # format:check + lint + build + typecheck + test
 GitHub `ppdoll/pdf-memo`를 Vercel에 한 번 import하면 된다. Root Directory는 비워 두고(저장소 루트),
 Framework Preset은 Other. 나머지는 루트 `vercel.json`이 지정한다.
 
-프로덕션 URL: https://pdf-memo-web.vercel.app (Vercel 팀 `ppdoll-7834's projects`, 프로젝트 `pdf-memo`).
+프로덕션 URL: https://all-read-memo.vercel.app (Vercel 팀 `ppdoll-7834's projects`, 프로젝트 `all-read-memo`; 2026-09-23 이름 변경). 옛 주소 https://pdf-memo-web.vercel.app 는 새 주소로 307 리다이렉트된다. 브라우저 저장소(IndexedDB)는 출처(origin)별이라 옛 주소에 저장한 문서는 새 주소에서 보이지 않으니, 옛 주소에 자료가 있었다면 백업 zip으로 옮겨야 한다.
 주의: Root Directory에 값이 들어가면 루트 `vercel.json`이 읽히지 않아 "No Output Directory named dist" 오류로 실패한다. 반드시 비워 둔다.
 
 | 경로     | 처리                                                          |

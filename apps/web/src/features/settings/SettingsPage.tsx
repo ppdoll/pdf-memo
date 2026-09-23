@@ -1,3 +1,4 @@
+import { APP_NAME } from '../../app/brand';
 import { requestPersistentStorage } from '../../lib/quota';
 import { BackupPanel } from '../backup/BackupPanel';
 import { InstallSettingsRow } from '../pwa/InstallSettingsRow';
@@ -9,7 +10,9 @@ export function SettingsPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <section className="rounded-xl border border-slate-200 bg-white p-5">
         <h1 className="text-xl font-semibold">설정</h1>
-        <p className="mt-1 text-sm text-slate-500">PDF MEMO v{__APP_VERSION__}</p>
+        <p className="mt-1 text-sm text-slate-500">
+          {APP_NAME} v{__APP_VERSION__}
+        </p>
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 text-sm">

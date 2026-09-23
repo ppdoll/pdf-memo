@@ -1,3 +1,4 @@
+import { APP_NAME } from '../../../app/brand';
 import { HEIC_MESSAGE, imagesTitle, isHeicFile } from './detect';
 
 /** 저장할 이미지의 긴 변 상한 (px). 필기용 화질로 충분하고 PDF가 너무 커지지 않는다 */
@@ -49,8 +50,8 @@ export async function buildImagePdf(
     page.drawImage(embedded, { x: 0, y: 0, width: w, height: h });
   }
   pdf.setTitle(title);
-  pdf.setProducer('PDF MEMO');
-  pdf.setCreator('PDF MEMO (이미지)');
+  pdf.setProducer(APP_NAME);
+  pdf.setCreator(`${APP_NAME} (이미지)`);
   const bytes = await pdf.save({ useObjectStreams: true });
   return { bytes, pageCount: images.length };
 }

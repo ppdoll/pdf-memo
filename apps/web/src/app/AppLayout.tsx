@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router';
 import { LeftRailAd, MobileBannerAd } from '../features/ads/AdSlots';
+import { APP_NAME } from './brand';
 
 function navClass({ isActive }: { isActive: boolean }): string {
   return isActive ? 'font-medium text-indigo-600' : 'text-slate-600 hover:text-slate-900';
@@ -15,7 +16,7 @@ export function AppLayout() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <Link to="/" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
             <img src="/favicon.svg" alt="" className="h-6 w-6" />
-            PDF MEMO
+            {APP_NAME}
           </Link>
           <nav className="flex gap-5 text-sm">
             <NavLink to="/" end className={navClass}>

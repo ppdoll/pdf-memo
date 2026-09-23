@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vitest/config';
 import pkg from './package.json';
+import { APP_DESCRIPTION, APP_NAME, APP_SHORT_NAME } from './src/app/brand';
 
 export default defineConfig({
   plugins: [
@@ -12,9 +13,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icons/apple-touch-icon.png'],
       manifest: {
-        name: 'PDF MEMO',
-        short_name: 'PDF MEMO',
-        description: 'PDF 위에 메모·필기·꾸미기를 하고 폴더로 정리하는 로컬 노트',
+        name: APP_NAME,
+        short_name: APP_SHORT_NAME,
+        description: APP_DESCRIPTION,
         lang: 'ko',
         start_url: '/',
         scope: '/',
