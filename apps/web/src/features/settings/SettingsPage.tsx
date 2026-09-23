@@ -1,5 +1,6 @@
 import { requestPersistentStorage } from '../../lib/quota';
 import { BackupPanel } from '../backup/BackupPanel';
+import { InstallSettingsRow } from '../pwa/InstallSettingsRow';
 import { ApiStatus } from '../status/ApiStatus';
 import { StorageStatus } from '../status/StorageStatus';
 
@@ -19,8 +20,9 @@ export function SettingsPage() {
         </p>
         <ul className="mt-3 list-disc space-y-1 pl-5 text-slate-600">
           <li>iPad·iPhone: 공유 → "홈 화면에 추가" (7일 미사용 삭제 규칙에서 제외됩니다)</li>
-          <li>Chrome·Edge: 주소창의 설치 아이콘으로 앱 설치</li>
+          <li>Chrome·Edge·안드로이드: 아래 버튼 또는 주소창의 설치 아이콘으로 앱 설치</li>
         </ul>
+        <InstallSettingsRow />
         <button
           type="button"
           onClick={() => void requestPersistentStorage()}
@@ -38,7 +40,7 @@ export function SettingsPage() {
       </div>
 
       <section className="rounded-xl border border-dashed border-slate-300 p-5 text-sm text-slate-500">
-        스티커 관리와 텍스트 메모 도구는 다음 단계에서 추가됩니다.
+        도형 도구와 PowerPoint 가져오기는 다음 단계에서 검토합니다.
       </section>
     </div>
   );

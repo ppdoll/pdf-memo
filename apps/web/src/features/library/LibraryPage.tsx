@@ -14,6 +14,7 @@ import { isImageFile } from '../import/images/detect';
 import { FolderIconEditor, type FolderIconPatch } from './FolderIconEditor';
 import { ImageImportChoice } from './import/ImageImportChoice';
 import { useImportQueue } from './import/useImportQueue';
+import { InstallBanner } from '../pwa/InstallBanner';
 import { RecentDocuments } from './RecentDocuments';
 import { libraryService } from './service';
 
@@ -182,6 +183,7 @@ export function LibraryPage() {
           )}
         </header>
 
+        {isRoot && <InstallBanner />}
         {isRoot && <BackupReminder documentCount={documents.length} />}
 
         {isRoot && <RecentDocuments />}
