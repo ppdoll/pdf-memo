@@ -812,7 +812,8 @@ Hobby 개인 계정에서 대시보드 설정 없이 push만으로 동작하도�
 - [x] 내보내기(2026-09-22): 필기 포함 PDF를 pdf-lib로 벡터 플래튼, 원본 PDF 저장, 모바일 공유 시트. 텍스트·노트는 Pretendard 서브셋을 CIDFontType0C로 임베드
 - [x] 백업 zip 내보내기 + 복원(2026-09-22): fflate 스트리밍 zip, 병합 복원(같은 id는 updatedAt 최신 우선, 부모 폴더 먼저·고아는 루트로), 설정 화면 백업 패널, 라이브러리 백업 알림
 - [x] 텍스트 메모(2026-09-22): 텍스트 상자·스티키 노트 — 탭으로 생성, textarea 편집(Ctrl+Enter 확정, Esc 취소), 드래그 이동, 폭 조절(높이 자동), Delete·지우개 삭제, Undo/Redo, 서식(크기·색·배경·정렬). 화면과 PDF가 같은 Pretendard(OFL) 폰트·줄바꿈 규칙(`features/text/wrap.ts`)을 써서 내보내기 결과가 화면과 일치한다
-- [ ] PWA: 매니페스트, 오프라인, 설치 배너, `persist()` 요청, 용량 게이지
+- [x] PWA(2026-09-23): 매니페스트·오프라인(SW)은 Phase 0, 설치 배너는 `features/pwa/` — `beforeinstallprompt`를 앱 시작 시 잡아 두고(기본 미니 배너 억제) 라이브러리 루트에 "홈 화면에 PDF MEMO 추가" 배너(Chromium은 설치 버튼, iOS Safari는 공유 → 홈 화면에 추가 안내), "나중에"는 14일 숨김(settings `pwa.installDismissedAt`), 설치·수락 시 `persist()` 요청, 설정 화면에도 설치 버튼/설치됨 상태. 용량 게이지·영구 저장 요청은 설정의 StorageStatus·데이터 보호 섹션
+- [x] 광고(2026-09-23): 카카오 애드핏 2종 — PC 왼쪽 세로 160×600(1280px 이상, 채워지기 전엔 폭 0), 모바일 하단 띠 320×50(768px 미만, 채워지면 본문 아래 여백). `features/ads/`(KakaoAd: 마운트마다 ba.min.js 재삽입, MutationObserver로 채움 감지, 언마운트 시 adfit.destroy). 앱 레이아웃(라이브러리·휴지통·설정)에만 붙고 뷰어에는 없다
 - [x] api: health/meta 배포
 
 **Phase 1.5 — 꾸미기·편의 (2~3주)**
