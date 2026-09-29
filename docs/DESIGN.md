@@ -623,6 +623,7 @@ pdfs/<hash>.pdf    원본 PDF
 - 좌표 변환: 페이지 공간 → PDF 사용자 공간 (y 반전, 페이지 회전 보정).
 - 옵션: "주석만 래스터로" (모든 레이어를 PNG로 굽는 폴백. 호환성 최우선일 때).
 - 결과는 `Blob` → 다운로드 또는 Web Share API로 공유.
+- 암호로 잠긴 PDF: pdf-lib은 암호화된 파일을 열지 못하므로 가져올 때 qpdf(WebAssembly)로 암호를 풀어 저장한다(§14 로드맵 "암호 걸린 PDF"). 그 전에 가져온, 소유자 암호(권한 제한)만 걸린 문서는 내보낼 때 빈 암호로 풀어 다시 시도한다(`exportService.unlockRestrictedPdf`).
 
 ### 9.2 기타
 
@@ -826,6 +827,7 @@ Hobby 개인 계정에서 대시보드 설정 없이 push만으로 동작하도�
 - [x] JSON 가져오기(2026-09-23): .json은 PDF로 바꾸지 않고 원본 바이트를 그대로 저장(`PdfDocument.kind = 'json'`, 없으면 pdf)하고 트리 뷰어(`features/json/`)로 연다 — 접기/펼치기(기본 깊이 2, 모두 펼치기/접기, 노드별 토글), 큰 배열은 200개씩 "더 보기", 키·값 찾기(조상 자동 펼침·강조), JSON 저장, "PDF로 만들기"(정리된 JSON 코드 블록을 마크다운 변환기로 A4 PDF 문서화). 문법 오류는 줄·열과 함께 알린다
 - [x] 폴더 아이콘(2026-09-23): 폴더 앞 네모를 눌러 색(팔레트 10색 + 직접 선택) 또는 이미지(가운데 정사각형 128px PNG, Asset kind 'icon', `Folder.iconAssetId`)로 바꾼다. 다른 폴더가 쓰지 않는 옛 아이콘 이미지는 지운다
 - [x] 도형(2026-09-23): 사각형·타원·선·화살표(`features/shape/`). 도형 도구(D)로 끌어서 그리고(탭은 기본 크기), 선 색·굵기·점선·채움을 툴바에서 정한다. 확정된 도형은 SVG 레이어(`<g transform=matrix>`로 페이지 좌표 그대로)에 그려 선택·이동·크기(회전 상자는 로컬 좌표로)·회전(직각 스냅)·선 끝점 이동을 지원하고, 그리는 중 미리보기는 라이브 캔버스에 그린다. 선·화살표는 (x,y)=시작점, w=길이, rotation=방향으로 저장. 지우개는 shapeHit(채움 없는 상자는 테두리만). 내보내기는 drawSvgPath(사각형·타원은 pdfAnchors 중심 회전, 선은 시작점 축 회전, 점선은 borderDashArray, 화살촉은 채운 삼각형)
+- [x] 암호 걸린 PDF(2026-09-30): 가져올 때 pdf.js가 PasswordException을 내면 대화상자(`features/import/encrypted/PdfPasswordDialog`, zustand 큐 `passwordPrompt`)로 암호를 묻고, qpdf 12.2 WebAssembly(`@neslinesli93/qpdf-wasm`, 워커 `qpdf.worker.ts`, 약 1.3MB는 처음 쓸 때 내려받아 SW CacheFirst로 보관)로 `--decrypt --deterministic-id` 해 푼 바이트를 저장한다(사용자·소유자 암호 모두 허용, 틀리면 다시 묻고 취소하면 `cancelled`). 사용자 암호가 비어 있어 열리기만 하는 문서(인쇄·복사 제한)는 pdf.js `EncryptFilterName`으로 알아채 묻지 않고 빈 암호로 푼다. 이렇게 해야 pdf-lib 내보내기가 된다. 그 전에 가져온 권한 제한 문서는 내보낼 때 같은 방법으로 풀어 재시도. 가져오기 단계 `password`·`decrypting` 추가. 웹 테스트 164개
 - [ ] 마스킹 테이프 가로 반복(repeat), 스티커 뒤집기(flipX/flipY)
 - [ ] 텍스트 형광펜(텍스트 레이어), 올가미 선택·변형
 - [ ] 페이지 썸네일 사이드바, PDF outline

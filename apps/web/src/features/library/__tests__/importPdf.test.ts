@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto';
 import { ROOT_FOLDER_ID } from '@pdf-memo/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DexieStorage } from '../../../storage/dexie/DexieStorage';
+import { PdfPasswordError } from '../../import/encrypted/errors';
 import { importPdfFile, isPdfFile, titleFromFileName, type PdfAnalyzer } from '../import/importPdf';
 
 const fakeAnalyze: PdfAnalyzer = async () => ({
@@ -11,7 +12,36 @@ const fakeAnalyze: PdfAnalyzer = async () => ({
     { w: 612, h: 792, rotation: 90 },
   ],
   thumbnail: { blob: new Blob(['jpeg-bytes'], { type: 'image/jpeg' }), width: 240, height: 311 },
+  encrypted: false,
 });
+
+/** pdf.js가 암호 없이 열지 못할 때 던지는 예외 흉내 */
+class FakePasswordException extends Error {
+  code: number;
+  constructor(code: number) {
+    super(code === 1 ? 'No password given' : 'Incorrect Password');
+    this.name = 'PasswordException';
+    this.code = code;
+  }
+}
+
+const LOCKED = 'locked-bytes';
+const OWNER_LOCKED = 'owner-locked-bytes';
+
+/** 잠긴 내용이면 pdf.js처럼 실패하고, 소유자 암호만 걸린 내용이면 encrypted를 알린다 */
+const lockAwareAnalyze: PdfAnalyzer = async (blob) => {
+  const text = await blob.text();
+  if (text === LOCKED) throw new FakePasswordException(1);
+  return { ...(await fakeAnalyze(blob)), encrypted: text === OWNER_LOCKED };
+};
+
+function fakeDecrypt(correct = 'secret') {
+  return vi.fn(async (file: File, password: string): Promise<File> => {
+    const text = await file.text();
+    if (text === LOCKED && password !== correct) throw new PdfPasswordError();
+    return new File([`unlocked:${text}`], file.name, { type: 'application/pdf' });
+  });
+}
 
 function pdfFile(name: string, content = '%PDF-1.4 sample'): File {
   return new File([content], name, { type: 'application/pdf' });
@@ -25,6 +55,121 @@ beforeEach(() => {
 
 afterEach(async () => {
   await storage.destroy();
+});
+
+describe('importPdfFile with encrypted PDFs', () => {
+  it('asks for the password, decrypts and stores the unlocked bytes', async () => {
+    const stages: string[] = [];
+    const requestPassword = vi.fn(async () => 'secret');
+    const decrypt = fakeDecrypt();
+    const outcome = await importPdfFile(pdfFile('잠김.pdf', LOCKED), {
+      storage,
+      analyze: lockAwareAnalyze,
+      folderId: ROOT_FOLDER_ID,
+      onStage: (s) => stages.push(s),
+      requestPassword,
+      decrypt,
+    });
+    expect(outcome).toMatchObject({ status: 'done', decrypted: true });
+    if (outcome.status !== 'done') return;
+    expect(requestPassword).toHaveBeenCalledWith({ fileName: '잠김.pdf', attempt: 1 });
+    expect(decrypt).toHaveBeenCalledTimes(1);
+    expect(stages).toEqual([
+      'hashing',
+      'analyzing',
+      'password',
+      'decrypting',
+      'hashing',
+      'analyzing',
+      'saving',
+    ]);
+    const doc = await storage.documents.get(outcome.documentId);
+    const stored = await storage.blobs.get(doc!.blobHash);
+    expect(await stored!.text()).toBe(`unlocked:${LOCKED}`);
+    expect(doc?.byteSize).toBe(stored!.size);
+    expect(doc?.originalFileName).toBe('잠김.pdf');
+  });
+
+  it('asks again after a wrong password and reports the attempt number', async () => {
+    const answers = ['wrong', 'secret'];
+    const requestPassword = vi.fn(async () => answers.shift() ?? null);
+    const outcome = await importPdfFile(pdfFile('잠김.pdf', LOCKED), {
+      storage,
+      analyze: lockAwareAnalyze,
+      folderId: ROOT_FOLDER_ID,
+      requestPassword,
+      decrypt: fakeDecrypt(),
+    });
+    expect(outcome).toMatchObject({ status: 'done', decrypted: true });
+    expect(requestPassword).toHaveBeenNthCalledWith(1, { fileName: '잠김.pdf', attempt: 1 });
+    expect(requestPassword).toHaveBeenNthCalledWith(2, { fileName: '잠김.pdf', attempt: 2 });
+  });
+
+  it('gives up cleanly when the prompt is cancelled', async () => {
+    const decrypt = fakeDecrypt();
+    const outcome = await importPdfFile(pdfFile('잠김.pdf', LOCKED), {
+      storage,
+      analyze: lockAwareAnalyze,
+      folderId: ROOT_FOLDER_ID,
+      requestPassword: async () => null,
+      decrypt,
+    });
+    expect(outcome).toEqual({ status: 'cancelled' });
+    expect(decrypt).not.toHaveBeenCalled();
+    expect(await storage.stats()).toMatchObject({ documents: 0, pdfBlobs: 0 });
+  });
+
+  it('silently removes owner-only restrictions with an empty password', async () => {
+    const requestPassword = vi.fn(async () => 'never');
+    const decrypt = fakeDecrypt();
+    const outcome = await importPdfFile(pdfFile('제한.pdf', OWNER_LOCKED), {
+      storage,
+      analyze: lockAwareAnalyze,
+      folderId: ROOT_FOLDER_ID,
+      requestPassword,
+      decrypt,
+    });
+    expect(outcome).toMatchObject({ status: 'done', decrypted: true });
+    expect(requestPassword).not.toHaveBeenCalled();
+    expect(decrypt).toHaveBeenCalledWith(expect.any(File), '');
+    if (outcome.status !== 'done') return;
+    const doc = await storage.documents.get(outcome.documentId);
+    const stored = await storage.blobs.get(doc!.blobHash);
+    expect(await stored!.text()).toBe(`unlocked:${OWNER_LOCKED}`);
+  });
+
+  it('treats a second import of the same locked file as a duplicate of the unlocked one', async () => {
+    const base = {
+      storage,
+      analyze: lockAwareAnalyze,
+      folderId: ROOT_FOLDER_ID,
+      requestPassword: async () => 'secret',
+      decrypt: fakeDecrypt(),
+    };
+    const first = await importPdfFile(pdfFile('잠김.pdf', LOCKED), base);
+    const second = await importPdfFile(pdfFile('잠김 복사본.pdf', LOCKED), base);
+    expect(first.status).toBe('done');
+    expect(second).toMatchObject({ status: 'duplicate', existingTitle: '잠김' });
+  });
+
+  it('reports locked files as an error when no prompt is available', async () => {
+    const outcome = await importPdfFile(pdfFile('잠김.pdf', LOCKED), {
+      storage,
+      analyze: lockAwareAnalyze,
+      folderId: ROOT_FOLDER_ID,
+    });
+    expect(outcome).toMatchObject({ status: 'error', message: expect.stringContaining('암호') });
+    expect(await storage.stats()).toMatchObject({ documents: 0, pdfBlobs: 0 });
+  });
+
+  it('stores owner-restricted files as they are when no decryptor is available', async () => {
+    const outcome = await importPdfFile(pdfFile('제한.pdf', OWNER_LOCKED), {
+      storage,
+      analyze: lockAwareAnalyze,
+      folderId: ROOT_FOLDER_ID,
+    });
+    expect(outcome).toMatchObject({ status: 'done', decrypted: false });
+  });
 });
 
 describe('helpers', () => {

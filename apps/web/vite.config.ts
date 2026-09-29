@@ -48,11 +48,24 @@ export default defineConfig({
               expiration: { maxEntries: 4, maxAgeSeconds: 60 * 60 * 24 * 365 },
             },
           },
+          {
+            // qpdf(암호 해제, 약 1.3MB)도 암호 걸린 PDF를 처음 만날 때 받아 오래 보관한다.
+            urlPattern: /\/assets\/.*\.wasm$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'wasm',
+              expiration: { maxEntries: 2, maxAgeSeconds: 60 * 60 * 24 * 365 },
+            },
+          },
         ],
       },
       devOptions: { enabled: false },
     }),
   ],
+  optimizeDeps: {
+    // 워커 안에서만 쓰는 CommonJS 글루 코드. 미리 번들해 두지 않으면 dev에서 워커의 첫 요청이 실패한다.
+    include: ['@neslinesli93/qpdf-wasm'],
+  },
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },

@@ -1,6 +1,8 @@
 import { newId } from '@pdf-memo/shared';
 import { useCallback, useRef, useState } from 'react';
 import { storage } from '../../../storage';
+import { decryptPdfFile } from '../../import/encrypted/decryptPdf';
+import { requestPdfPassword } from '../../import/encrypted/passwordPrompt';
 import { HEIC_MESSAGE, imagesTitle, isHeicFile, isImageFile } from '../../import/images/detect';
 import { isJsonFile } from '../../import/json/detect';
 import { isMarkdownFile } from '../../import/markdown/detect';
@@ -103,14 +105,24 @@ export function useImportQueue() {
           patch(job.item.id, { outcome: { status: 'error', message: `변환 실패: ${message}` } });
           continue;
         }
-        const outcome = await importPdfFile(source.file, {
-          storage,
-          analyze: analyzePdf,
-          folderId: job.folderId,
-          onStage: (stage) => patch(job.item.id, { stage }),
-          title: source.title,
-          originalFileName: source.originalFileName,
-        });
+        let outcome: ImportOutcome;
+        try {
+          outcome = await importPdfFile(source.file, {
+            storage,
+            analyze: analyzePdf,
+            folderId: job.folderId,
+            onStage: (stage) => patch(job.item.id, { stage }),
+            title: source.title,
+            originalFileName: source.originalFileName,
+            // 암호가 걸린 PDF는 대화상자로 암호를 물어 qpdf(워커)로 푼 뒤 저장한다
+            requestPassword: requestPdfPassword,
+            decrypt: decryptPdfFile,
+          });
+        } catch (error) {
+          // 예상 못 한 실패(저장소 오류 등)도 항목에 남겨야 큐가 "진행 중"에 멈춰 보이지 않는다
+          const message = error instanceof Error ? error.message : String(error);
+          outcome = { status: 'error', message: `가져오기 실패: ${message}` };
+        }
         patch(job.item.id, { outcome });
       }
     } finally {

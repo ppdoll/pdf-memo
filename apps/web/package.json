@@ -12,6 +12,7 @@
     "gen:icons": "node scripts/gen-icons.mjs"
   },
   "dependencies": {
+    "@neslinesli93/qpdf-wasm": "0.3.0",
     "@pdf-memo/shared": "workspace:*",
     "dexie": "^4.0.11",
     "fflate": "^0.8.2",

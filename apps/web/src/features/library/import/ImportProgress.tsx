@@ -6,6 +6,8 @@ const STAGE_LABEL: Record<ImportItem['stage'], string> = {
   converting: 'PDF로 변환 중',
   hashing: '중복 확인 중',
   analyzing: '내용 분석 중',
+  password: '암호 입력 기다리는 중',
+  decrypting: '암호 푸는 중',
   saving: '저장 중',
 };
 
@@ -73,16 +75,18 @@ function statusIcon(item: ImportItem) {
     );
   if (item.outcome.status === 'done') return <span className="text-emerald-600">✓</span>;
   if (item.outcome.status === 'duplicate') return <span className="text-amber-500">≡</span>;
+  if (item.outcome.status === 'cancelled') return <span className="text-slate-400">–</span>;
   return <span className="text-red-500">!</span>;
 }
 
 function statusText(item: ImportItem) {
   const { outcome } = item;
   if (!outcome) return STAGE_LABEL[item.stage];
+  if (outcome.status === 'cancelled') return '취소함';
   if (outcome.status === 'done') {
     return (
       <>
-        완료 ·{' '}
+        {outcome.decrypted ? '완료 (암호 풀어 저장)' : '완료'} ·{' '}
         <Link to={`/d/${outcome.documentId}`} className="text-indigo-600 hover:underline">
           열기
         </Link>

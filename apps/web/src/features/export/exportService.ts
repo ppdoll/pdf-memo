@@ -1,8 +1,15 @@
 import { documentKind, type AnnotationObject } from '@pdf-memo/shared';
 import type { Storage } from '../../storage/ports';
+import { decryptPdfFile } from '../import/encrypted/decryptPdf';
+import { isIncorrectPassword } from '../import/encrypted/errors';
 import { isPackAssetId } from '../sticker/pack';
 import { loadTextFontBytes } from '../text/font';
-import { flattenAnnotations, type FlattenAssets, type FlattenOptions } from './flatten';
+import {
+  EncryptedPdfError,
+  flattenAnnotations,
+  type FlattenAssets,
+  type FlattenOptions,
+} from './flatten';
 
 export type ExportKind = 'original' | 'flattened';
 
@@ -60,14 +67,31 @@ export async function exportDocument(
   const needsFont = annotations.some((o) => o.type === 'text' || o.type === 'note');
   const fontBytes = options.fontBytes ?? (needsFont ? await loadTextFontBytes() : undefined);
   const assets = options.assets ?? (await loadImageAssets(storage, annotations));
-  const { bytes, drawn, skipped } = await flattenAnnotations(original, annotations, {
-    ...options,
-    fontBytes,
-    assets,
-  });
+  const flattenOptions: FlattenOptions = { ...options, fontBytes, assets };
+  let result: Awaited<ReturnType<typeof flattenAnnotations>>;
+  try {
+    result = await flattenAnnotations(original, annotations, flattenOptions);
+  } catch (error) {
+    if (!(error instanceof EncryptedPdfError)) throw error;
+    // 암호 해제가 생기기 전에 가져온, 소유자 암호만 걸린 PDF: 빈 암호로 풀어 다시 시도한다
+    const unlocked = await unlockRestrictedPdf(blob);
+    result = await flattenAnnotations(unlocked, annotations, flattenOptions);
+  }
+  const { bytes, drawn, skipped } = result;
   // pdf-lib가 돌려준 뷰를 새 ArrayBuffer로 복사해 BlobPart 타입에 맞춘다
   const part = new Uint8Array(bytes);
   return { file: new File([part], name, { type: 'application/pdf' }), drawn, skipped };
+}
+
+/** 사용자 암호 없이 열리는(권한 제한만 걸린) PDF의 암호화를 걷어낸다. 진짜 암호가 필요하면 EncryptedPdfError */
+async function unlockRestrictedPdf(blob: Blob): Promise<Uint8Array> {
+  try {
+    const file = await decryptPdfFile(blob, '');
+    return new Uint8Array(await file.arrayBuffer());
+  } catch (error) {
+    if (isIncorrectPassword(error)) throw new EncryptedPdfError();
+    throw error;
+  }
 }
 
 /** 살아 있는 이미지 객체가 참조하는 사용자 자산(사진) 바이트를 모은다. 팩 스티커는 벡터라 제외 */

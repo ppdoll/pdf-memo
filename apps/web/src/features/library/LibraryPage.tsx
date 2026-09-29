@@ -13,6 +13,7 @@ import { ImportProgress } from './import/ImportProgress';
 import { isImageFile } from '../import/images/detect';
 import { FolderIconEditor, type FolderIconPatch } from './FolderIconEditor';
 import { ImageImportChoice } from './import/ImageImportChoice';
+import { PdfPasswordDialog } from '../import/encrypted/PdfPasswordDialog';
 import { useImportQueue } from './import/useImportQueue';
 import { InstallBanner } from '../pwa/InstallBanner';
 import { RecentDocuments } from './RecentDocuments';
@@ -247,6 +248,7 @@ export function LibraryPage() {
           onCancel={() => setPendingImages(null)}
         />
       )}
+      <PdfPasswordDialog />
       <ImportProgress items={items} onDismiss={dismiss} onClearFinished={clearFinished} />
     </Dropzone>
   );

@@ -117,7 +117,7 @@ export function JsonDocumentPage({ doc, blob }: JsonDocumentPageProps) {
       });
       if (outcome.status === 'done') navigate(`/d/${outcome.documentId}`);
       else if (outcome.status === 'duplicate') navigate(`/d/${outcome.existingDocumentId}`);
-      else setNotice(outcome.message);
+      else if (outcome.status === 'error') setNotice(outcome.message);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : String(error));
     } finally {

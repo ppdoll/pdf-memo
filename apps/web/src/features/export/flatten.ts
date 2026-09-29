@@ -41,7 +41,7 @@ export interface FlattenResult {
 
 export class EncryptedPdfError extends Error {
   constructor() {
-    super('암호로 보호된 PDF는 내보낼 수 없습니다');
+    super('암호로 보호된 PDF는 내보낼 수 없습니다. 문서를 다시 가져오면 암호를 풀 수 있습니다');
     this.name = 'EncryptedPdfError';
   }
 }

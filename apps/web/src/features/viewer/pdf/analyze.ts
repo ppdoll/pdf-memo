@@ -29,9 +29,22 @@ export async function analyzePdf(blob: Blob): Promise<PdfAnalysis> {
       page.cleanup();
     }
     const thumbnail = await renderThumbnail(doc);
-    return { pageCount: doc.numPages, pageSizes, thumbnail };
+    return { pageCount: doc.numPages, pageSizes, thumbnail, encrypted: await isEncrypted(doc) };
   } finally {
     await task.destroy();
+  }
+}
+
+/**
+ * /Encrypt 사전이 있으면 true. 사용자 암호가 비어 있으면(소유자 암호만 걸림) pdf.js는 그냥 열지만
+ * pdf-lib는 열지 못하므로, 가져오기가 이 값을 보고 빈 암호로 푼다.
+ */
+async function isEncrypted(doc: PDFDocumentProxy): Promise<boolean> {
+  try {
+    const { info } = await doc.getMetadata();
+    return Boolean((info as { EncryptFilterName?: string | null }).EncryptFilterName);
+  } catch {
+    return false;
   }
 }
 
