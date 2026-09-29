@@ -4,14 +4,36 @@
     {
       "name": "web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@pdf-memo/web", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@pdf-memo/web",
+        "dev"
+      ],
       "port": 5173
     },
     {
       "name": "api",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@pdf-memo/api", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@pdf-memo/api",
+        "dev"
+      ],
       "port": 3000
+    },
+    {
+      "name": "web-preview",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@pdf-memo/web",
+        "preview",
+        "--",
+        "--port",
+        "4173",
+        "--strictPort"
+      ],
+      "port": 4173
     }
   ]
 }
