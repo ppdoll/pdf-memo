@@ -1,6 +1,6 @@
 import { ROOT_FOLDER_ID, createFolder, type Folder, type PdfDocument } from '@pdf-memo/shared';
 import { generateKeyBetween } from 'fractional-indexing';
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Link, useParams } from 'react-router';
 import { useSubscribable } from '../../lib/useSubscribable';
 import { storage } from '../../storage';
@@ -14,6 +14,8 @@ import { isImageFile } from '../import/images/detect';
 import { FolderIconEditor, type FolderIconPatch } from './FolderIconEditor';
 import { ImageImportChoice } from './import/ImageImportChoice';
 import { PdfPasswordDialog } from '../import/encrypted/PdfPasswordDialog';
+import { clipboardFiles, isEditableTarget } from '../import/paste/clipboard';
+import { PasteImportDialog } from '../import/paste/PasteImportDialog';
 import { useImportQueue } from './import/useImportQueue';
 import { InstallBanner } from '../pwa/InstallBanner';
 import { RecentDocuments } from './RecentDocuments';
@@ -32,6 +34,8 @@ export function LibraryPage() {
   const { items, importFiles, dismiss, clearFinished } = useImportQueue();
   /** 한 번에 넣은 이미지가 2장 이상이면 묶을지 물어본다 */
   const [pendingImages, setPendingImages] = useState<File[] | null>(null);
+  /** 붙여넣기 대화상자에 미리 채울 글. null이면 닫힘 */
+  const [pasteDraft, setPasteDraft] = useState<string | null>(null);
   /** 아이콘을 편집 중인 폴더 */
   const [iconFolderId, setIconFolderId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -93,13 +97,35 @@ export function LibraryPage() {
     void exporter.run(doc.id, 'flattened', 'download');
   }
 
-  function handleFiles(files: File[]) {
-    const images = files.filter(isImageFile);
-    const others = files.filter((f) => !isImageFile(f));
-    if (others.length > 0) importFiles(others, folderId);
-    if (images.length >= 2) setPendingImages(images);
-    else if (images.length === 1) importFiles(images, folderId);
-  }
+  const handleFiles = useCallback(
+    (files: File[]) => {
+      const images = files.filter(isImageFile);
+      const others = files.filter((f) => !isImageFile(f));
+      if (others.length > 0) importFiles(others, folderId);
+      if (images.length >= 2) setPendingImages(images);
+      else if (images.length === 1) importFiles(images, folderId);
+    },
+    [folderId, importFiles],
+  );
+
+  // 라이브러리 화면에서 Ctrl+V: 파일(스크린샷 등)은 바로 가져오고, 글은 붙여넣기 대화상자를 연다
+  useEffect(() => {
+    function onPaste(event: globalThis.ClipboardEvent) {
+      if (pasteDraft !== null || isEditableTarget(event.target)) return;
+      const files = clipboardFiles(event.clipboardData);
+      if (files.length > 0) {
+        event.preventDefault();
+        handleFiles(files);
+        return;
+      }
+      const text = event.clipboardData?.getData('text/plain') ?? '';
+      if (text.trim().length === 0) return;
+      event.preventDefault();
+      setPasteDraft(text);
+    }
+    document.addEventListener('paste', onPaste);
+    return () => document.removeEventListener('paste', onPaste);
+  }, [handleFiles, pasteDraft]);
 
   function onPickFiles(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
@@ -156,6 +182,15 @@ export function LibraryPage() {
                 className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
               >
                 가져오기
+              </button>
+              <button
+                type="button"
+                onClick={() => setPasteDraft('')}
+                title="복사한 글(마크다운·JSON·일반 글)을 붙여 넣어 문서를 만듭니다"
+                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-50"
+                data-paste-open
+              >
+                붙여넣기
               </button>
               <input
                 ref={fileInputRef}
@@ -220,6 +255,7 @@ export function LibraryPage() {
           <div className="rounded-2xl border-2 border-dashed border-slate-300 px-6 py-16 text-center">
             <p className="text-sm text-slate-600">
               PDF·마크다운(.md)·JSON·이미지 파일을 여기에 끌어다 놓거나 "가져오기"를 누르세요.
+              복사한 글은 "붙여넣기"(또는 Ctrl+V)로 바로 문서가 됩니다.
             </p>
             <p className="mt-1 text-xs text-slate-400">
               파일은 이 브라우저 안에만 저장되고 서버로 올라가지 않습니다.
@@ -246,6 +282,20 @@ export function LibraryPage() {
             importFiles(files, folderId, { mergeImages: merge });
           }}
           onCancel={() => setPendingImages(null)}
+        />
+      )}
+      {pasteDraft !== null && (
+        <PasteImportDialog
+          initialText={pasteDraft}
+          onImport={(file, title) => {
+            setPasteDraft(null);
+            importFiles([file], folderId, { title });
+          }}
+          onImportFiles={(files) => {
+            setPasteDraft(null);
+            handleFiles(files);
+          }}
+          onClose={() => setPasteDraft(null)}
         />
       )}
       <PdfPasswordDialog />

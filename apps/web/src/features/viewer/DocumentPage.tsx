@@ -12,10 +12,12 @@ import {
   type Tool,
 } from '../annotate/toolStore';
 import { ExportMenu } from '../export/ExportMenu';
+import { clipboardFiles, isEditableTarget } from '../import/paste/clipboard';
 import { JsonDocumentPage } from '../json/JsonDocumentPage';
 import { libraryService } from '../library/service';
 import { useSelectionStore } from '../text/selectionStore';
 import { stepZoom } from './layout';
+import { pasteOntoPage } from './pasteOntoPage';
 import { PdfViewer, type PdfViewerHandle, type ZoomSetting } from './PdfViewer';
 import { usePdfDocument } from './usePdfDocument';
 import { ViewerToolbar } from './ViewerToolbar';
@@ -177,6 +179,28 @@ function DocumentViewer({ doc, blob }: { doc: PdfDocument; blob: Blob | null }) 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [currentPage, doc.pageCount, goToPage, session]);
+
+  // 붙여넣기(Ctrl+V): 글은 텍스트 상자로, 스크린샷 같은 이미지는 스티커로 현재 페이지 가운데에 놓는다.
+  // 텍스트 상자를 편집 중이면 그 입력란이 받도록 둔다
+  useEffect(() => {
+    function onPaste(event: ClipboardEvent) {
+      if (isEditableTarget(event.target) || useSelectionStore.getState().editingId) return;
+      const data = event.clipboardData;
+      const pageSize = doc.pageSizes[currentPage];
+      if (!data || !pageSize) return;
+      const images = clipboardFiles(data).filter((file) => file.type.startsWith('image/'));
+      const text = data.getData('text/plain');
+      if (images.length === 0 && text.trim().length === 0) return;
+      event.preventDefault();
+      pasteOntoPage({ storage, session, pageIndex: currentPage, pageSize, images, text }).catch(
+        (error: unknown) => {
+          window.alert(`붙여넣기 실패: ${error instanceof Error ? error.message : String(error)}`);
+        },
+      );
+    }
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [currentPage, doc.pageSizes, session]);
 
   const backHref = doc.folderId === ROOT_FOLDER_ID ? '/' : `/f/${doc.folderId}`;
 

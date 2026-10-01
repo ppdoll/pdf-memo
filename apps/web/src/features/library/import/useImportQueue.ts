@@ -22,11 +22,15 @@ interface ImportJob {
   /** 보통 파일 하나. 이미지를 한 문서로 묶을 때만 여러 개 */
   files: File[];
   folderId: string;
+  /** 변환기가 뽑는 제목 대신 쓸 제목 (붙여넣기 대화상자에서 고친 제목) */
+  title?: string;
 }
 
 export interface ImportFilesOptions {
   /** 이미지 여러 장을 한 문서(여러 페이지)로 묶는다. 이미지가 아닌 파일은 각각 처리 */
   mergeImages?: boolean;
+  /** 이번에 넣는 문서의 제목을 정해 준다 */
+  title?: string;
 }
 
 interface PdfSource {
@@ -112,7 +116,7 @@ export function useImportQueue() {
             analyze: analyzePdf,
             folderId: job.folderId,
             onStage: (stage) => patch(job.item.id, { stage }),
-            title: source.title,
+            title: job.title ?? source.title,
             originalFileName: source.originalFileName,
             // 암호가 걸린 PDF는 대화상자로 암호를 물어 qpdf(워커)로 푼 뒤 저장한다
             requestPassword: requestPdfPassword,
@@ -137,6 +141,7 @@ export function useImportQueue() {
         item: { id: newId(), fileName: file.name, stage: 'queued' },
         files: [file],
         folderId,
+        title: options.title,
       });
       const jobs: ImportJob[] = [];
       if (options.mergeImages) {
@@ -147,6 +152,7 @@ export function useImportQueue() {
             item: { id: newId(), fileName: imagesTitle(images), stage: 'queued' },
             files: images,
             folderId,
+            title: options.title,
           });
         }
         jobs.push(...others.map(single));
