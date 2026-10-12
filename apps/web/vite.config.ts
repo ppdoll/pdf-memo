@@ -36,6 +36,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,mjs,css,html,svg,png,woff2}'],
+        // DuckDB 워커(약 0.8MB)는 SQL 질의를 처음 쓸 때 받는다 (아래 runtimeCaching)
+        globIgnores: ['**/duckdb-browser-*.worker*.js'],
         // API 요청은 SPA 폴백(index.html)으로 가로채지 않는다.
         navigateFallbackDenylist: [/^\/api\//],
         // 텍스트 폰트(약 1.5MB)는 프리캐시하지 않고 처음 쓸 때 받아 오래 보관한다.
@@ -49,12 +51,20 @@ export default defineConfig({
             },
           },
           {
-            // qpdf(암호 해제, 약 1.3MB)도 암호 걸린 PDF를 처음 만날 때 받아 오래 보관한다.
+            // qpdf(암호 해제, 약 1.3MB)와 DuckDB(SQL 질의, 약 34MB)는 처음 쓸 때 받아 오래 보관한다.
             urlPattern: /\/assets\/.*\.wasm$/,
             handler: 'CacheFirst',
             options: {
               cacheName: 'wasm',
-              expiration: { maxEntries: 2, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              expiration: { maxEntries: 3, maxAgeSeconds: 60 * 60 * 24 * 365 },
+            },
+          },
+          {
+            urlPattern: /\/assets\/duckdb-browser-.*\.worker.*\.js$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'wasm',
+              expiration: { maxEntries: 3, maxAgeSeconds: 60 * 60 * 24 * 365 },
             },
           },
         ],

@@ -19,6 +19,8 @@ import {
   type TableColumn,
 } from './model';
 import { FULL_LOAD_MAX_ROWS, openParquet, type ParquetTable } from './parquet';
+import { QueryPanel } from './QueryPanel';
+import type { QueryResult } from './sql';
 
 type LoadState =
   | { status: 'loading'; message: string }
@@ -48,6 +50,9 @@ export function TableDocumentPage({ doc, blob }: TableDocumentPageProps) {
   const [pageRows, setPageRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [sqlOpen, setSqlOpen] = useState(false);
+  /** SQL 질의 결과. 있으면 원본 표 대신 보여 준다 */
+  const [result, setResult] = useState<QueryResult | null>(null);
 
   useEffect(() => {
     if (!blob) return;
@@ -55,6 +60,7 @@ export function TableDocumentPage({ doc, blob }: TableDocumentPageProps) {
     setState({ status: 'loading', message: '표를 여는 중…' });
     setPage(0);
     setSort(null);
+    setResult(null);
     (async () => {
       const table = await openParquet(await blob.arrayBuffer());
       if (cancelled) return;
@@ -91,15 +97,33 @@ export function TableDocumentPage({ doc, blob }: TableDocumentPageProps) {
 
   // 찾기·정렬이 바뀌면 첫 쪽으로
   useEffect(() => setPage(0), [debounced, sort]);
+  // 질의 결과가 바뀌면 찾기·정렬도 처음부터
+  useEffect(() => {
+    setSort(null);
+    setQuery('');
+    setPage(0);
+  }, [result]);
 
   const ready = state.status === 'ready' ? state : null;
-  const columns: TableColumn[] = ready?.table.columns ?? [];
-  const pageMode = ready !== null && ready.all === null;
+  const resultIndex = useMemo(
+    () => new WeakMap((result?.rows ?? []).map((row, i) => [row, i] as const)),
+    [result],
+  );
+  /** 지금 격자에 보여 줄 데이터: 질의 결과가 있으면 그것, 없으면 원본 표 */
+  const dataset = useMemo(() => {
+    if (result) {
+      return { columns: result.columns, all: result.rows as Row[] | null, indexOf: resultIndex };
+    }
+    if (ready) return { columns: ready.table.columns, all: ready.all, indexOf: ready.indexOf };
+    return null;
+  }, [result, ready, resultIndex]);
+  const columns: TableColumn[] = dataset?.columns ?? [];
+  const pageMode = dataset !== null && dataset.all === null;
 
   const view = useMemo(() => {
-    if (!ready || !ready.all) return [];
-    return sortRows(filterRows(ready.all, ready.table.columns, debounced), sort);
-  }, [ready, debounced, sort]);
+    if (!dataset?.all) return [];
+    return sortRows(filterRows(dataset.all, dataset.columns, debounced), sort);
+  }, [dataset, debounced, sort]);
 
   const total = pageMode ? (ready?.table.rowCount ?? 0) : view.length;
   const pages = pageCount(total);
@@ -127,7 +151,7 @@ export function TableDocumentPage({ doc, blob }: TableDocumentPageProps) {
 
   function rowNumber(row: Row, i: number): number {
     if (pageMode) return safePage * ROWS_PER_PAGE + i + 1;
-    return (ready?.indexOf.get(row) ?? i) + 1;
+    return (dataset?.indexOf.get(row) ?? i) + 1;
   }
 
   function saveOriginal() {
@@ -141,7 +165,7 @@ export function TableDocumentPage({ doc, blob }: TableDocumentPageProps) {
     if (!ready) return;
     setNotice(null);
     const bom = String.fromCharCode(0xfeff);
-    const name = `${sanitizeFileName(doc.title)}.csv`;
+    const name = `${sanitizeFileName(doc.title)}${result ? ' (질의)' : ''}.csv`;
     try {
       if (!pageMode) {
         downloadFile(new File([bom, toCsv(columns, view)], name, { type: 'text/csv' }));
@@ -226,10 +250,24 @@ export function TableDocumentPage({ doc, blob }: TableDocumentPageProps) {
         <div className="flex items-center gap-0.5">
           <button
             type="button"
+            onClick={() => {
+              if (sqlOpen) setResult(null);
+              setSqlOpen((open) => !open);
+            }}
+            disabled={!ready}
+            className={`${chip} ${sqlOpen ? 'bg-indigo-50 text-indigo-700' : ''} disabled:opacity-50`}
+            aria-pressed={sqlOpen}
+            title="SQL로 표를 질의합니다 (DuckDB)"
+            data-table-sql
+          >
+            SQL
+          </button>
+          <button
+            type="button"
             onClick={() => void saveCsv()}
             disabled={!ready || busy !== null}
             className={`${chip} disabled:opacity-50`}
-            title="찾기·정렬이 적용된 표를 CSV(엑셀)로 저장합니다"
+            title="찾기·정렬이 적용된 표(또는 질의 결과)를 CSV(엑셀)로 저장합니다"
             data-table-csv
           >
             {busy ?? 'CSV 저장'}
@@ -248,6 +286,15 @@ export function TableDocumentPage({ doc, blob }: TableDocumentPageProps) {
           {notice}
         </p>
       )}
+      {sqlOpen && ready && (
+        <QueryPanel
+          doc={doc}
+          blob={blob}
+          sourceColumns={ready.table.columns}
+          onResult={setResult}
+          onClose={() => setSqlOpen(false)}
+        />
+      )}
       <main className="min-h-0 flex-1 overflow-auto px-3 py-3 sm:px-5">
         {state.status === 'loading' && <p className="text-sm text-slate-500">{state.message}</p>}
         {state.status === 'error' && (
@@ -259,10 +306,17 @@ export function TableDocumentPage({ doc, blob }: TableDocumentPageProps) {
           <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-1.5 text-xs text-slate-600">
               <span data-table-range>
+                {result && (
+                  <span className="mr-2 rounded bg-indigo-50 px-1.5 py-0.5 text-indigo-700">
+                    질의 결과
+                  </span>
+                )}
                 {total === 0
                   ? '행이 없습니다'
                   : `${firstRow.toLocaleString()}–${lastRow.toLocaleString()} / ${total.toLocaleString()}행`}
                 {pageMode && ' · 행이 많아 쪽마다 읽습니다 (찾기·정렬 없음)'}
+                {result?.truncated &&
+                  ` · 결과가 많아 처음 ${total.toLocaleString()}행만 보여 줍니다`}
               </span>
               <span className="flex items-center gap-1">
                 <button

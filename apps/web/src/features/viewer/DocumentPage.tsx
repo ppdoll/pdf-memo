@@ -85,8 +85,10 @@ export function DocumentPage() {
       </ViewerMessage>
     );
   }
-  if (documentKind(doc) === 'json') return <JsonDocumentPage doc={doc} blob={blob} />;
-  if (documentKind(doc) === 'table') return <TableDocumentPage doc={doc} blob={blob} />;
+  // key: 문서가 바뀌면(질의 결과로 만든 표를 열 때 등) 이전 문서의 상태가 남지 않게 새로 그린다
+  if (documentKind(doc) === 'json') return <JsonDocumentPage key={doc.id} doc={doc} blob={blob} />;
+  if (documentKind(doc) === 'table')
+    return <TableDocumentPage key={doc.id} doc={doc} blob={blob} />;
   return <DocumentViewer doc={doc} blob={blob} />;
 }
 
