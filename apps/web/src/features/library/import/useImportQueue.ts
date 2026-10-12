@@ -6,8 +6,10 @@ import { requestPdfPassword } from '../../import/encrypted/passwordPrompt';
 import { HEIC_MESSAGE, imagesTitle, isHeicFile, isImageFile } from '../../import/images/detect';
 import { isJsonFile } from '../../import/json/detect';
 import { isMarkdownFile } from '../../import/markdown/detect';
+import { isParquetFile } from '../../import/parquet/detect';
 import { analyzePdf } from '../../viewer/pdf/analyze';
 import { importJsonFile } from './importJson';
+import { importParquetFile, inspectParquet } from './importParquet';
 import { importPdfFile, type ImportOutcome, type ImportStage } from './importPdf';
 
 export interface ImportItem {
@@ -99,6 +101,17 @@ export function useImportQueue() {
             onStage: (stage) => patch(job.item.id, { stage }),
           });
           patch(job.item.id, { outcome: jsonOutcome });
+          continue;
+        }
+        if (job.files.length === 1 && isParquetFile(job.files[0])) {
+          // Parquet도 바이트를 그대로 저장하고 표 뷰어로 연다 (디코더는 필요할 때 내려받는다)
+          const tableOutcome = await importParquetFile(job.files[0], {
+            storage,
+            folderId: job.folderId,
+            inspect: inspectParquet,
+            onStage: (stage) => patch(job.item.id, { stage }),
+          });
+          patch(job.item.id, { outcome: tableOutcome });
           continue;
         }
         let source: PdfSource;

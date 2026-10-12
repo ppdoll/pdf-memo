@@ -178,7 +178,7 @@ export function LibraryPage() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                title="PDF, 마크다운(.md), 텍스트(.txt), JSON, 이미지(JPEG·PNG 등) 파일을 가져옵니다"
+                title="PDF, 마크다운(.md), 텍스트(.txt), JSON, Parquet, 이미지(JPEG·PNG 등) 파일을 가져옵니다"
                 className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
               >
                 가져오기
@@ -195,7 +195,7 @@ export function LibraryPage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="application/pdf,.pdf,.md,.markdown,.txt,text/markdown,text/plain,.json,application/json,image/*"
+                accept="application/pdf,.pdf,.md,.markdown,.txt,text/markdown,text/plain,.json,application/json,.parquet,application/vnd.apache.parquet,image/*"
                 multiple
                 hidden
                 onChange={onPickFiles}
@@ -254,8 +254,8 @@ export function LibraryPage() {
         {empty && (
           <div className="rounded-2xl border-2 border-dashed border-slate-300 px-6 py-16 text-center">
             <p className="text-sm text-slate-600">
-              PDF·마크다운(.md)·JSON·이미지 파일을 여기에 끌어다 놓거나 "가져오기"를 누르세요.
-              복사한 글은 "붙여넣기"(또는 Ctrl+V)로 바로 문서가 됩니다.
+              PDF·마크다운(.md)·JSON·Parquet·이미지 파일을 여기에 끌어다 놓거나 "가져오기"를
+              누르세요. 복사한 글은 "붙여넣기"(또는 Ctrl+V)로 바로 문서가 됩니다.
             </p>
             <p className="mt-1 text-xs text-slate-400">
               파일은 이 브라우저 안에만 저장되고 서버로 올라가지 않습니다.

@@ -15,6 +15,7 @@ import { ExportMenu } from '../export/ExportMenu';
 import { clipboardFiles, isEditableTarget } from '../import/paste/clipboard';
 import { JsonDocumentPage } from '../json/JsonDocumentPage';
 import { libraryService } from '../library/service';
+import { TableDocumentPage } from '../table/TableDocumentPage';
 import { useSelectionStore } from '../text/selectionStore';
 import { stepZoom } from './layout';
 import { pasteOntoPage } from './pasteOntoPage';
@@ -85,6 +86,7 @@ export function DocumentPage() {
     );
   }
   if (documentKind(doc) === 'json') return <JsonDocumentPage doc={doc} blob={blob} />;
+  if (documentKind(doc) === 'table') return <TableDocumentPage doc={doc} blob={blob} />;
   return <DocumentViewer doc={doc} blob={blob} />;
 }
 

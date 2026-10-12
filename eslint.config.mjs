@@ -12,6 +12,8 @@ export default [
       '**/coverage/**',
       '**/dev-dist/**',
       '**/.turbo/**',
+      // 데스크톱 앱이 세션용 작업 트리를 .claude/worktrees에 만든다. 저장소 밖 사본이라 린트하지 않는다
+      '**/.claude/**',
       'pnpm-lock.yaml',
     ],
   },

@@ -1,7 +1,7 @@
 import { newId, nowIso } from '../ids';
 import { ANNOTATION_SCHEMA_VERSION, type BBox } from './annotation';
 import type { BaseEntity } from './base';
-import type { DocumentKind, PageSize, PdfDocument } from './document';
+import type { DocumentKind, PageSize, PdfDocument, TableInfo } from './document';
 import { ROOT_FOLDER_ID, type Folder } from './folder';
 
 /** 새 엔티티의 공통 필드. rev는 0으로 시작하고 저장소가 첫 저장에서 1로 올린다. */
@@ -38,6 +38,7 @@ export interface CreatePdfDocumentInput {
   sortKey: string;
   folderId?: string;
   kind?: DocumentKind;
+  table?: TableInfo;
 }
 
 export function createPdfDocument(input: CreatePdfDocumentInput): PdfDocument {
@@ -45,6 +46,7 @@ export function createPdfDocument(input: CreatePdfDocumentInput): PdfDocument {
     ...createEntityBase(),
     folderId: input.folderId ?? ROOT_FOLDER_ID,
     kind: input.kind ?? 'pdf',
+    ...(input.table ? { table: input.table } : {}),
     title: input.title.trim(),
     originalFileName: input.originalFileName,
     blobHash: input.blobHash,

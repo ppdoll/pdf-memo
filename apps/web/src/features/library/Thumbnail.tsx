@@ -7,7 +7,7 @@ interface ThumbnailProps {
   alt: string;
   className?: string;
   /** 자리표시자 모양 */
-  kind?: 'pdf' | 'json';
+  kind?: 'pdf' | 'json' | 'table';
 }
 
 /** 저장된 썸네일 Asset을 표시. 없으면 PDF 아이콘 자리표시자 */
@@ -39,6 +39,18 @@ export function Thumbnail({ assetId, alt, className = '', kind = 'pdf' }: Thumbn
       >
         {kind === 'json' ? (
           <span className="font-mono text-3xl font-semibold text-amber-400">{'{ }'}</span>
+        ) : kind === 'table' ? (
+          <svg
+            viewBox="0 0 24 24"
+            className="h-10 w-10 text-emerald-400"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            data-thumbnail-table
+          >
+            <rect x="3" y="4" width="18" height="16" rx="2" />
+            <path d="M3 9h18M3 14h18M9 4v16M15 4v16" />
+          </svg>
         ) : (
           <svg
             viewBox="0 0 24 24"

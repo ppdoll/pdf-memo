@@ -2,6 +2,7 @@ import { documentKind, type AnnotationObject } from '@pdf-memo/shared';
 import type { Storage } from '../../storage/ports';
 import { decryptPdfFile } from '../import/encrypted/decryptPdf';
 import { isIncorrectPassword } from '../import/encrypted/errors';
+import { PARQUET_MIME } from '../import/parquet/detect';
 import { isPackAssetId } from '../sticker/pack';
 import { loadTextFontBytes } from '../text/font';
 import {
@@ -54,6 +55,10 @@ export async function exportDocument(
   if (documentKind(doc) === 'json') {
     const jsonName = `${sanitizeFileName(doc.title)}.json`;
     return { file: new File([blob], jsonName, { type: 'application/json' }), drawn: 0, skipped: 0 };
+  }
+  if (documentKind(doc) === 'table') {
+    const tableName = `${sanitizeFileName(doc.title)}.parquet`;
+    return { file: new File([blob], tableName, { type: PARQUET_MIME }), drawn: 0, skipped: 0 };
   }
 
   const name = exportFileName(doc.title, kind);

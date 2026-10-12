@@ -20,13 +20,22 @@ export function DocumentCard({
   onExport,
   exporting = false,
 }: DocumentCardProps) {
-  const isJson = documentKind(doc) === 'json';
+  const kind = documentKind(doc);
+  const isJson = kind === 'json';
+  const isTable = kind === 'table';
+  const kindLabel = isJson
+    ? 'JSON'
+    : isTable
+      ? doc.table
+        ? `표 ${doc.table.rows.toLocaleString()}행 × ${doc.table.columns}열`
+        : '표'
+      : `${doc.pageCount}쪽`;
   return (
     <li className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:border-indigo-300 hover:shadow-sm">
       <Link to={`/d/${doc.id}`} className="block">
         <Thumbnail
           assetId={doc.thumbnailAssetId}
-          kind={isJson ? 'json' : 'pdf'}
+          kind={kind}
           alt=""
           className="h-40 w-full border-b border-slate-100"
         />
@@ -35,8 +44,7 @@ export function DocumentCard({
             {doc.title}
           </p>
           <p className="mt-1 text-xs text-slate-500">
-            {isJson ? 'JSON' : `${doc.pageCount}쪽`} · {formatBytes(doc.byteSize)} ·{' '}
-            {formatRelative(doc.updatedAt)}
+            {kindLabel} · {formatBytes(doc.byteSize)} · {formatRelative(doc.updatedAt)}
           </p>
         </div>
       </Link>
@@ -45,7 +53,7 @@ export function DocumentCard({
           exporting ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        {!isJson && (
+        {!isJson && !isTable && (
           <button
             type="button"
             onClick={() => onExport(doc)}
